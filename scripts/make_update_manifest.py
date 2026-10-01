@@ -53,6 +53,11 @@ def main() -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     asset = f"ATC-FTS_{VERSION}_x64-setup.exe"
+    # Everything in this folder is uploaded to the release: drop installers
+    # left by an earlier version's build.
+    for stale in out.glob("ATC-FTS_*-setup.exe"):
+        if stale.name != asset:
+            stale.unlink()
     shutil.copy2(installer, out / asset)
 
     manifest = {
