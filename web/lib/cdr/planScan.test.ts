@@ -107,6 +107,11 @@ describe("scanFlightPlanConflicts", () => {
     }
     const t = Date.now();
     scanFlightPlanConflicts(all, cfg);
-    expect(Date.now() - t).toBeLessThan(1000);
+    // What this guards against is the scan going quadratic again: without the
+    // prefilter it took ~6 s on a fast desktop, i.e. 20 s+ on a shared CI
+    // runner. Those runners are ~4x slower than a desktop (1.3 s measured for
+    // this healthy scan), so CI gets a budget that still catches that.
+    const budgetMs = process.env.CI ? 5000 : 1000;
+    expect(Date.now() - t).toBeLessThan(budgetMs);
   });
 });
