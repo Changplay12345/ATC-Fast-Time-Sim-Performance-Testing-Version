@@ -37,6 +37,7 @@ from typing import NamedTuple
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -155,6 +156,13 @@ else:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+# Compress responses for clients that accept it (every browser does). A
+# 40-flight /api/generate_batch chunk is ~3 MB of JSON — ~240 MB for a
+# 2 000-flight import — and shrinks ~5x. Level 5, not Starlette's default 9:
+# it keeps nearly all of the size win for a third of the CPU, and CPU is what a
+# small host has least of. Bodies under 1 KB aren't worth the header overhead.
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 
 
 class GenerateRequest(BaseModel):
