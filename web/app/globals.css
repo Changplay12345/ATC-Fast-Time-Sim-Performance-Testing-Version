@@ -12669,3 +12669,49 @@ select.fp-input {
   letter-spacing: 0.06em;
   color: var(--accent-ink);
 }
+
+/* --- Desktop app: update banner (shown on every screen) ---
+   Top-right, as a compact card: clear of the opening card (centred) and of
+   the main view's controls (bars along the top, toasts bottom-right, legend
+   bottom-left). */
+.update-banner {
+  position: fixed;
+  top: 96px;
+  right: 16px;
+  z-index: 3500; /* above the map chrome, below a modal (4000) */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.update-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.update-banner-text strong {
+  font-size: 13px;
+  color: var(--text);
+}
+.update-banner-text span {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.update-banner-text .about-bar {
+  margin-top: 6px;
+}
+.update-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.update-banner-actions .primary {
+  flex: 1 1 100%;
+}

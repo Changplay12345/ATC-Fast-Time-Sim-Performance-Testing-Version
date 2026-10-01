@@ -546,3 +546,58 @@ Simulation Tool"). Uninstall from Settings → Apps, or run `uninstall.exe` ther
 4. De-duplicate `public/data` (42 MB shipped twice) and `proj.db`.
 5. Worker count from free RAM on 8 GB machines.
 6. Run the smoke test on a clean Windows 10 and 11 VM.
+
+## 14. Release pipeline and auto-update: verified end to end (2026-10-02)
+
+The repository is public. Releases: `v0.2.0`, `v0.2.1` (and `v0.2.2` with
+the update banner), all built and published by `.github/workflows/desktop.yml`.
+
+### CI release run (per tag)
+
+`test` (Linux, ~1.5 min) then `release` (Windows, ~17 min cold): tag matches
+`VERSION` -> install toolchains -> `desktop/build.ps1` -> `desktop/smoke.ps1
+-Install` on the clean runner (8 checks) -> publish `ATC-FTS_<v>_x64-setup.exe`
+and `latest.json`. The smoke test passing on GitHub's runner is the
+"clean machine" check Phase 0 could not do locally.
+
+### Update test, 0.2.0 -> 0.2.1
+
+| Step | Observed |
+|---|---|
+| Public manifest, no login | `releases/latest/download/latest.json` -> 0.2.1 |
+| Installed 0.2.0 (CI build), before the release | `check_update` -> not available |
+| After `v0.2.1` was published | About: "Version 0.2.1 is available", release notes shown, dot on the nav button |
+| Install and restart | Download with live progress (0 -> 100 %), app exited after 10 s, installer ran without prompts |
+| Relaunch | The app came back by itself; exe 0.2.1, engine 0.2.1 |
+| Feature only in the new version | "What's new in 0.2.1" section present (absent in 0.2.0) |
+| Check again | "You are up to date." |
+
+No SmartScreen prompt appeared during the update: the updater downloads the
+installer itself, so the file carries no "downloaded from the internet" mark.
+(A first install from a browser download still shows the prompt, unsigned.)
+
+### Update notice
+
+0.2.0/0.2.1 only showed an update as a dot on the About button, which is not
+on screen until a flight exists. From 0.2.2 a banner appears on every screen
+(top-right): "Version X is available" with Install and restart / What's new /
+Later. Verified with a local build of the banner code stamped 0.2.0 against
+the published 0.2.1. The check runs 3 s after launch and hourly.
+
+### Bugs and gotchas in this step
+
+| Problem | Cause | Fix |
+|---|---|---|
+| CI failed on `planScan.test.ts` (1341 ms > 1000 ms) | A timing guard tuned for a desktop; shared runners are ~4x slower | 5 s budget when `CI` is set |
+| First banner covered the opening card's title and Generate button | Top-centre placement | Top-right compact card |
+| `release/` kept the previous installer | Folder never cleaned | The manifest script removes stale installers |
+| To test the banner without two more release cycles | Only a version that contains the banner can show it | Build the new code stamped with an older version locally; restore `VERSION` afterwards |
+
+### Operational notes
+
+- **Releasing:** edit `VERSION` and `RELEASE_NOTES.md`, run
+  `python scripts/sync_version.py`, commit, `git tag v<version>`, push the tag.
+- **The updater key** (`%USERPROFILE%\.tauri\atc-fts-updater.key`, also the
+  `TAURI_SIGNING_PRIVATE_KEY` secret) must be backed up. Without it no
+  installed app can ever be updated again.
+- Every push to `main` also redeploys the hosted API (Render) and site (Vercel).

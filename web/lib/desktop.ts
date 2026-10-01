@@ -74,9 +74,10 @@ export interface DesktopUpdate {
 }
 
 /** First check a few seconds after launch, so it never competes with start-up. */
-const FIRST_CHECK_MS = 8_000;
-/** Then, like most desktop software, a few times a day while the app is open. */
-const RECHECK_MS = 4 * 60 * 60 * 1000;
+const FIRST_CHECK_MS = 3_000;
+/** Then hourly while the app is open, so a release reaches a running app the
+ *  same day without the user having to restart it. */
+const RECHECK_MS = 60 * 60 * 1000;
 
 /**
  * Background update check for the desktop app. It only ever *reports* an

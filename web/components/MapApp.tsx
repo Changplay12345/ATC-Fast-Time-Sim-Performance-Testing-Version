@@ -161,6 +161,7 @@ import {
 } from "@/lib/cdr/planScan";
 import { usePlanScan } from "@/lib/cdr/usePlanScan";
 import AboutDialog from "@/components/desktop/AboutDialog";
+import UpdateBanner from "@/components/desktop/UpdateBanner";
 import { IS_DESKTOP } from "@/lib/backend";
 import { useDesktopUpdate } from "@/lib/desktop";
 import { makeSepMinNmAt } from "@/lib/cdr/sepMinAt";
@@ -4236,6 +4237,11 @@ export default function MapApp() {
       )}
       {IS_DESKTOP && aboutOpen && (
         <AboutDialog onClose={closeAbout} update={desktopUpdate} busy={sim.playing} />
+      )}
+      {/* Outside the nav bar on purpose: an update must be announced on every
+          screen, including the opening one where the bar is not shown. */}
+      {IS_DESKTOP && !aboutOpen && (
+        <UpdateBanner update={desktopUpdate} busy={sim.playing} onDetails={openAbout} />
       )}
 
       {/* The workspace under the bar: the Generator rail and the map it drives.
