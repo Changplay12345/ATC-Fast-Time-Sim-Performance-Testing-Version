@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "ATC Fast-Time Simulation Tool",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "th.co.bearcat.atcfts",
   "build": {
     "frontendDist": "../../web/.next-desktop",
@@ -11,11 +11,14 @@
     "windows": [],
     "security": {
       "csp": null
-    }
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "publisher": "BearCat AEL Co",
     "copyright": "Copyright (c) 2026 BearCat AEL Co. All rights reserved.",
     "shortDescription": "Air-traffic fast-time simulation and trajectory generation",
@@ -32,10 +35,24 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["English"]
+        "languages": [
+          "English"
+        ]
       },
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZGQjUzOUMxMkMwRTYwMDUKUldRRllBNHN3VG0xLzJhNDJqeEZSVjNLR0kydjVnZWtMRWdDMWkvTmxHOGsrdGY4NEhZWFllbDMK",
+      "endpoints": [
+        "https://github.com/Changplay12345/ATC-Fast-Time-Sim-Performance-Testing-Version/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

@@ -21,6 +21,7 @@
  */
 
 import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/backend";
 
 export interface Cat62Table {
   thresholdMin: number;
@@ -36,7 +37,7 @@ let _cache: Promise<Cat62Table> | null = null;
 
 export function fetchCat62Reference(): Promise<Cat62Table> {
   if (!_cache) {
-    _cache = fetch(`${API_BASE}/api/cat62_reference`, { cache: "no-store" })
+    _cache = apiFetch(`${API_BASE}/api/cat62_reference`, { cache: "no-store" })
       .then((r) => {
         if (!r.ok) throw new Error(`cat62_reference ${r.status}`);
         return r.json();
@@ -112,7 +113,7 @@ export function fetchFlightTimeCurve(
   const ac = aircraftType.trim().toUpperCase();
   const qs = new URLSearchParams({ actype: ac });
   if (cruiseAltFt != null) qs.set("cruise_alt_ft", String(cruiseAltFt));
-  return fetch(`${API_BASE}/api/flight_time_curve?${qs}`, {
+  return apiFetch(`${API_BASE}/api/flight_time_curve?${qs}`, {
     cache: "no-store",
   })
     .then((r) => {

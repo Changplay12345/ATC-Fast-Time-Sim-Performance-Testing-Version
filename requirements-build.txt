@@ -1,0 +1,2 @@
+# Build-only tools for the desktop app (not needed to run or host the engine).
+pyinstaller==6.22.3

@@ -63,6 +63,10 @@ export interface MainNavigationProps {
   /** The on-screen frame-rate overlay (FpsMeter) on/off. */
   fpsOn?: boolean;
   onToggleFps?: () => void;
+  /** Desktop app only: opens the About / updates dialog. */
+  onAbout?: () => void;
+  /** An update is waiting — marks the About button. */
+  updateReady?: boolean;
   /** Phone only: the workspace rail is a drawer there, and this opens it. */
   onToggleSidebar?: () => void;
 }
@@ -77,6 +81,8 @@ function MainNavigation({
   onToggleSound,
   fpsOn,
   onToggleFps,
+  onAbout,
+  updateReady,
   onToggleSidebar,
 }: MainNavigationProps) {
   const [openId, setOpenId] = useState<MainNavId | null>(null);
@@ -156,6 +162,20 @@ function MainNavigation({
       {/* Chrome that belongs to no tab: sound, the FPS overlay, the UI theme
           and the map's zoom. */}
       <div className="mnav-util">
+        {onAbout && (
+          <button
+            type="button"
+            className={`mnav-util-btn${updateReady ? " has-update" : ""}`}
+            onClick={() => {
+              close();
+              onAbout();
+            }}
+            title={updateReady ? "An update is available" : "About and updates"}
+            aria-label={updateReady ? "About — an update is available" : "About and updates"}
+          >
+            <NavIcon name="info" size={15} />
+          </button>
+        )}
         {onToggleFps && (
           <button
             type="button"

@@ -68,7 +68,8 @@ export type NavIconName =
   | "tag"
   | "trails"
   | "file"
-  | "clearance";
+  | "clearance"
+  | "info";
 
 const PATHS: Record<NavIconName, ReactNode> = {
   home: (
@@ -153,6 +154,12 @@ const PATHS: Record<NavIconName, ReactNode> = {
     <>
       <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
       <path d="M16 9.5l5 5M21 9.5l-5 5" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6M12 7.4v.6" />
     </>
   ),
   fps: (

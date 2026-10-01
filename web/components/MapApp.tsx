@@ -160,6 +160,9 @@ import {
   type PlanFlight,
 } from "@/lib/cdr/planScan";
 import { usePlanScan } from "@/lib/cdr/usePlanScan";
+import AboutDialog from "@/components/desktop/AboutDialog";
+import { IS_DESKTOP } from "@/lib/backend";
+import { useDesktopUpdate } from "@/lib/desktop";
 import { makeSepMinNmAt } from "@/lib/cdr/sepMinAt";
 import { buildLosMarks } from "@/lib/cdr/losMarks";
 import {
@@ -756,6 +759,12 @@ export default function MapApp() {
       return !on;
     });
   }, []);
+  // Desktop app only: the About / updates dialog and the background update
+  // check (a no-op hook on the web).
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const openAbout = useCallback(() => setAboutOpen(true), []);
+  const closeAbout = useCallback(() => setAboutOpen(false), []);
+  const desktopUpdate = useDesktopUpdate(IS_DESKTOP);
   const [basemap, setBasemap] = useState<Basemap>("dark");
 
   // Flipping the theme carries the CANVAS basemap with it. The two were
@@ -4220,8 +4229,13 @@ export default function MapApp() {
           onToggleSound={toggleSound}
           fpsOn={fpsOn}
           onToggleFps={toggleFps}
+          onAbout={IS_DESKTOP ? openAbout : undefined}
+          updateReady={desktopUpdate.status === "available"}
           onToggleSidebar={toggleSidebar}
         />
+      )}
+      {IS_DESKTOP && aboutOpen && (
+        <AboutDialog onClose={closeAbout} update={desktopUpdate} busy={sim.playing} />
       )}
 
       {/* The workspace under the bar: the Generator rail and the map it drives.

@@ -17,6 +17,7 @@ by `trajectory_sim.output.write_geopackage`.
 from __future__ import annotations
 
 import csv
+import hmac
 import io
 import json
 import multiprocessing
@@ -38,8 +39,10 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
+
+from api.version import __version__
 
 from trajectory_sim.fpl import FlightPlan, parse_eobt, parse_route
 from trajectory_sim.geodesy import (
@@ -114,7 +117,10 @@ _DATA = _ROOT / "web" / "public" / "data"
 # into this JSON cache by scripts/ingest_aip.py (waypoints + airways).
 # Replaces the hand-curated VTPStoVTBS.csv / airway_waypoint.geojson.
 _AIP_PATH = _DATA / "aip_VT.json"
-_OUT_DIR = _ROOT / "api" / "_outputs"
+# Rendered export files. The desktop shell points this at the user's data
+# folder ($ATC_OUT_DIR): the install folder may not be writable, and an
+# uninstall must not take the user's exports with it.
+_OUT_DIR = Path(os.environ.get("ATC_OUT_DIR") or (_ROOT / "api" / "_outputs"))
 _OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Cache-Control for the rarely-changing reference endpoints (procedures).
@@ -128,7 +134,67 @@ _STATIC_CACHE = "public, max-age=86400"  # 1 day
 def _sq_dist(a: tuple[float, float], b: tuple[float, float]) -> float:
     return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
 
-app = FastAPI(title="Flight Trajectory Generator API", version="1.0")
+# --- Local (desktop) mode ---------------------------------------------------
+# The desktop shell runs this engine on the user's own machine and sets
+# ATC_LOCAL_MODE=1 with a random per-session ATC_SESSION_TOKEN. In that mode
+# the engine is not a public API: it binds to 127.0.0.1 (see the sidecar's
+# entry point), answers only requests carrying the token, allows only the
+# shell's own page origin (below), and does not serve the interactive docs.
+_LOCAL_MODE = os.environ.get("ATC_LOCAL_MODE", "").strip() == "1"
+_SESSION_TOKEN = os.environ.get("ATC_SESSION_TOKEN", "").strip()
+
+app = FastAPI(
+    title="Flight Trajectory Generator API",
+    version=__version__,
+    docs_url=None if _LOCAL_MODE else "/docs",
+    redoc_url=None if _LOCAL_MODE else "/redoc",
+    openapi_url=None if _LOCAL_MODE else "/openapi.json",
+)
+
+
+class _SessionTokenMiddleware:
+    """Reject API requests that do not carry the session token.
+
+    Pure ASGI (no per-request task or body buffering), and a no-op when no
+    token is configured — the hosted API is unaffected. The token rides in
+    ``Authorization: Bearer …``; a GET may carry it as ``?t=…`` instead, for
+    the downloads the page starts by navigation, where no header can be set.
+    ``/api/health`` stays open (the shell polls it before the page exists and
+    it reveals nothing), and so do CORS preflights, which never carry
+    credentials — the CORS middleware outside this one answers those.
+    """
+
+    def __init__(self, inner):  # noqa: ANN001 — ASGI app
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):  # noqa: ANN001
+        token = _SESSION_TOKEN
+        if not token or scope["type"] != "http":
+            return await self.inner(scope, receive, send)
+        path = scope.get("path", "")
+        method = scope.get("method", "GET")
+        if method == "OPTIONS" or path == "/api/health" or not path.startswith("/api/"):
+            return await self.inner(scope, receive, send)
+        supplied = ""
+        for name, value in scope.get("headers", []):
+            if name == b"authorization":
+                text = value.decode("latin-1")
+                if text[:7].lower() == "bearer ":
+                    supplied = text[7:].strip()
+                break
+        if not supplied and method == "GET":
+            from urllib.parse import parse_qs
+
+            supplied = (parse_qs(scope.get("query_string", b"").decode("latin-1")).get("t") or [""])[0]
+        if hmac.compare_digest(supplied.encode(), token.encode()):
+            return await self.inner(scope, receive, send)
+        response = JSONResponse({"detail": "Unauthorized"}, status_code=401)
+        return await response(scope, receive, send)
+
+
+# Added first, so it sits INSIDE the CORS middleware: a 401 still gets its
+# CORS headers (the page sees "unauthorized", not an opaque network error).
+app.add_middleware(_SessionTokenMiddleware)
 
 # Allowed browser origins:
 #   - any localhost port  (dev server falls back to :3001/:3002… if busy)
@@ -152,7 +218,12 @@ else:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_extra_origins,
-        allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+|https://[\w-]+\.vercel\.app",
+        # Local mode: only the origins the shell names in $WEB_ORIGIN (its own
+        # page). No pattern — another local web page must not be able to call
+        # the engine even if it somehow learned the token.
+        allow_origin_regex=None
+        if _LOCAL_MODE
+        else r"http://(localhost|127\.0\.0\.1):\d+|https://[\w-]+\.vercel\.app",
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -623,7 +694,12 @@ def _expand_airways(route_str: str) -> str:
 
 @app.get("/api/health")
 def health() -> dict[str, object]:
-    info: dict[str, object] = {"ok": True, "aip_present": _AIP_PATH.is_file()}
+    info: dict[str, object] = {
+        "ok": True,
+        "version": __version__,
+        "mode": "local" if _LOCAL_MODE else "hosted",
+        "aip_present": _AIP_PATH.is_file(),
+    }
     if _AIP_PATH.is_file():
         try:
             aip = _aip()

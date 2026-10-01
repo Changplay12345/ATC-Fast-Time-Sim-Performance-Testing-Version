@@ -15,9 +15,11 @@ import type {
   RouteWaypoint,
   TrajectoryResult,
 } from "@/lib/trajectory/types";
+import { API_BASE, apiFetch } from "@/lib/backend";
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+// The engine's address and the session-token-aware fetch live in
+// lib/backend.ts (build-time for the web, injected by the shell on desktop).
+export { API_BASE };
 
 export interface GenerateInput {
   source: "csv" | "fpl";
@@ -167,7 +169,7 @@ export async function generateTrajectory(
 ): Promise<GenerateResponse> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/generate`, {
+    res = await apiFetch(`${API_BASE}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -210,7 +212,7 @@ export async function extendDownwind(
 ): Promise<GenerateResponse> {
   let res: Response;
   try {
-    res = await fetch(
+    res = await apiFetch(
       `${API_BASE}/api/extend/${encodeURIComponent(flightKey)}`,
       {
         method: "POST",
@@ -382,7 +384,7 @@ export async function generateBatch(
 ): Promise<BatchResponse> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/generate_batch`, {
+    res = await apiFetch(`${API_BASE}/api/generate_batch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flights, index_offset: indexOffset }),
@@ -467,7 +469,7 @@ export async function listProcedures(airport: string): Promise<ProcedureList> {
   };
   let res: Response;
   try {
-    res = await fetch(
+    res = await apiFetch(
       `${API_BASE}/api/procedures/${encodeURIComponent(code)}`,
     );
   } catch {
@@ -512,7 +514,7 @@ export async function fetchProcedure(
   )}/${encodeURIComponent(name)}?${q.toString()}`;
   let res: Response;
   try {
-    res = await fetch(url);
+    res = await apiFetch(url);
   } catch {
     throw new Error(`Cannot reach the Python API at ${API_BASE}.`);
   }
@@ -547,7 +549,7 @@ export async function suggestProcedure(
   const q = new URLSearchParams({ type, route: route.trim() });
   if (runway) q.set("runway", runway);
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE}/api/suggest-procedure/${encodeURIComponent(code)}?${q}`,
     );
     if (!res.ok) return null;
@@ -592,7 +594,7 @@ export async function fetchApproachEntries(
   if (opts.route && opts.route.trim()) q.set("route", opts.route.trim());
   if (opts.star) q.set("star", opts.star);
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE}/api/approach-entries/${encodeURIComponent(
         code,
       )}/${encodeURIComponent(name)}?${q}`,
@@ -652,7 +654,7 @@ export async function ingestTrajectory(input: {
   downloads: { gpkg: string; csv: string; geojson: string };
 } | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/ingest`, {
+    const res = await apiFetch(`${API_BASE}/api/ingest`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -712,7 +714,7 @@ export async function setConflictMarks(
 ): Promise<boolean> {
   if (marks.length === 0) return true;
   try {
-    const res = await fetch(`${API_BASE}/api/conflict_marks`, {
+    const res = await apiFetch(`${API_BASE}/api/conflict_marks`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ marks }),
@@ -737,7 +739,7 @@ export async function recacheTrajectory(
   }[],
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/api/recache`, {
+    const res = await apiFetch(`${API_BASE}/api/recache`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

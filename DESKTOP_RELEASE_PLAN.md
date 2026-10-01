@@ -510,3 +510,39 @@ cd ../desktop && npx tauri build      # needs %USERPROFILE%\.cargo\bin on PATH
 The spike build is **installed** per-user at
 `%LOCALAPPDATA%\ATC Fast-Time Simulation Tool` (Start menu → "ATC Fast-Time
 Simulation Tool"). Uninstall from Settings → Apps, or run `uninstall.exe` there.
+
+## 13. Phase 1 progress (2026-10-02)
+
+### Done and verified
+
+| Item | How it works | Verified by |
+|---|---|---|
+| Secure local engine | The shell picks a free port, generates a 32-byte session token, and starts the engine with `ATC_LOCAL_MODE=1`. The engine binds `127.0.0.1`, requires `Authorization: Bearer <token>` on every `/api/*` request except `/api/health` and CORS preflights, accepts `?t=<token>` on GET only (for navigation downloads), allows only the Tauri page origins, and serves no docs | `tests/test_session_token.py` (8 tests); `desktop/smoke.ps1`; from the page: no token 401, wrong token 401, header 200, query 200, docs 404 |
+| Runtime backend config | `web/lib/backend.ts`: the shell injects a frozen `window.__APP_CONFIG__` before any page script; the web build falls back to `NEXT_PUBLIC_API_BASE`. Every engine call goes through `apiFetch` | `backend.test.ts` (12 tests, incl. a source scan that fails on a bare `fetch(` in the API modules) |
+| One version source | `VERSION` -> `api/version.py` at runtime; `scripts/sync_version.py` stamps and checks the shell manifests; `/api/health` reports it and the shell compares | smoke test "engine version matches VERSION" |
+| User data out of the install folder | Exports in `%LOCALAPPDATA%\th.co.bearcat.atcfts\exports` (`ATC_OUT_DIR`), logs in `...\logs`, `engine.pid` beside them | app run; About -> Open exports folder |
+| No orphaned engines | (1) the shell stops the engine on exit; (2) the engine watches the shell's PID and exits when it is gone; (3) the next launch sweeps a PID file left by a crash | smoke test "engine exits when the app is killed" |
+| Start-up failure is visible | A native error box naming the log file, instead of a silent exit | code path; not yet forced in a test |
+| About / updates UI | Info button in the nav bar (desktop only), dot when an update waits; dialog shows version, engine, navdata cycle, update status, install button (held while a replay runs), logs/exports folders, support address | driven through WebView2's debug port; screenshot |
+| Updater | `tauri-plugin-updater`; manifests signed with a minisign key (private half outside the repo, public half in `tauri.conf.json`); check on launch + every 4 h + on demand; download and install only on request; the engine is stopped before the installer runs | compiles, build emits `.sig`; `check_update` fails cleanly with no release. **End-to-end update not yet tested** (needs a public release) |
+| Release folder | `scripts/make_update_manifest.py` -> `release/ATC-FTS_<v>_x64-setup.exe` + `release/latest.json` | built: 57.3 MB installer, manifest with signature |
+| Build + smoke scripts | `desktop/build.ps1`, `desktop/smoke.ps1` | both run locally |
+| CI | `.github/workflows/desktop.yml`: tests on every push; on a `v*` tag, build -> smoke -> publish release | not yet run |
+
+### Bugs found in this step
+
+| Problem | Cause | Fix |
+|---|---|---|
+| Procedure lookups returned 401 in the desktop app | Five `fetch(` calls in `api.ts` were split across lines or took a prebuilt URL, so a one-line search-and-replace to `apiFetch` missed them | Regex replace; a test now scans the modules for any bare `fetch(` |
+| `smoke.ps1` would not parse | Windows PowerShell 5.1 reads a BOM-less UTF-8 script as ANSI; an em dash became a quote character | Keep `.ps1` files ASCII-only |
+| Plan said "no CORS in local mode" | The page (`http://tauri.localhost`) and the engine (`http://127.0.0.1:<port>`) are different origins | CORS stays, restricted to exactly the shell's page origins, no pattern |
+| Updater error text was developer wording | Raw plugin error shown | Plain sentence; detail in the tooltip |
+
+### Remaining for Phase 1
+
+1. **Make the repository public** (decision A) and add the `TAURI_SIGNING_PRIVATE_KEY` secret; then tag `v0.2.0`.
+2. End-to-end update test: install 0.2.0, publish 0.2.1, confirm the app finds it, installs it and restarts on it.
+3. First-run EULA screen; `PRIVACY.md`; third-party notices.
+4. De-duplicate `public/data` (42 MB shipped twice) and `proj.db`.
+5. Worker count from free RAM on 8 GB machines.
+6. Run the smoke test on a clean Windows 10 and 11 VM.

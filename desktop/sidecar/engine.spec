@@ -29,6 +29,8 @@ datas = [
     # Aircraft performance tables + CAT62 reference — ~0.5 MB.
     (os.path.join(ROOT, "trajectory_sim", "data"), os.path.join("trajectory_sim", "data")),
     (os.path.join(ROOT, "thai_aip_ad2_thr_elevations.csv"), "."),
+    # The single version source; api/version.py reads it next to the packages.
+    (os.path.join(ROOT, "VERSION"), "."),
 ]
 # pyogrio has no PyInstaller hook; its wheel carries GDAL's and PROJ's data
 # folders and points GDAL at them itself as long as they sit next to the

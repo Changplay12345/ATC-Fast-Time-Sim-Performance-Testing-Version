@@ -11,6 +11,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import { API_BASE } from "@/lib/api";
+import { apiFetch, withToken } from "@/lib/backend";
 import {
   progressNote,
   progressPercent,
@@ -134,7 +135,9 @@ function QuestionIcon() {
  */
 function fireDownload(url: string): void {
   const iframe = document.createElement("iframe");
-  iframe.src = url;
+  // A navigation cannot carry the Authorization header; on desktop the
+  // session token goes in the query string instead (a no-op on the web).
+  iframe.src = withToken(url);
   iframe.style.display = "none";
   document.body.appendChild(iframe);
   // Give the browser plenty of time to consume the response before
@@ -436,7 +439,7 @@ function DownloadModal({
     onBytes?: (received: number, total: number | null) => void,
   ): Promise<boolean> => {
     try {
-      const res = await fetch(`${API_BASE}${endpoint}`, {
+      const res = await apiFetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -498,7 +501,7 @@ function DownloadModal({
     for (let i = 0; i < files.length; i += batch) {
       const slice = files.slice(i, i + batch);
       try {
-        const res = await fetch(`${API_BASE}/api/export_prepare`, {
+        const res = await apiFetch(`${API_BASE}/api/export_prepare`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ files: slice }),
