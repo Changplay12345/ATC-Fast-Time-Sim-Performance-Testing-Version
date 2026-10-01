@@ -800,3 +800,107 @@ Modified: `web/components/MapApp.tsx`, `LeafletMap.tsx`, `GpuTraffic.tsx`,
 `RouteResultTabs.tsx`, `web/lib/useSimPlayback.ts`, `lib/pdr/usePdrCheck.ts`,
 `lib/trajectory/types.ts`, `web/app/globals.css`, `api/server.py`.
 Typecheck clean; vitest 934 passed / 8 skipped; pytest 15 passed.
+
+---
+---
+
+# Part 4 — The deployed backend (Render free plan) and gzip (2026-10-01)
+
+After deploying (Vercel `atc-fast-time-sim.vercel.app` → Render
+`atc-fast-time-sim-performance-testing.onrender.com`, free plan, Singapore),
+the user reported "Generate all" stuck at 0 and slower than local.
+
+## 1. Results
+
+| Measurement (one 40-flight `/api/generate_batch` chunk) | Value |
+|---|---|
+| Local PC, parallel (Part 2) | ~0.8 s |
+| Render free, `ATC_GEN_WORKERS=1` | 51–56 s (~1.3 s/flight, ~15–20× local) |
+| Render free, `ATC_GEN_WORKERS=2` | **20–21 s** (2.6× faster); first chunk ~40 s while workers start |
+| Response size, plain → gzip level 5 | 3.24 MB → **0.66 MB** (4.9×) |
+| Total chunk time, plain vs gzip (Bangkok → Singapore) | 21.0–21.4 s vs 21.0–21.5 s — **no measurable change** |
+| Memory, 2 workers + 40 cached flights | 283 MB of 512 MB |
+
+## 2. Root cause of "stuck at 0"
+
+Render's event log: `server_failed … oomKilled, memoryLimit 512Mi` at
+14:05:35 — during the user's import, with 1 worker. The server keeps every
+generated flight's GeoDataFrame in `_EXPORT_CACHE` for downloads, ~367 KB per
+flight (measured in Part 2's notes: 121 MB warm + 0.36 MB × flights), so a
+2,000-flight import needs ~830 MB. The process was killed; the browser waited
+on requests that never answered. The progress text only advances per chunk
+(40 flights, ~50 s on this host), which made a slow start look frozen too.
+
+## 3. How it was measured
+
+1. **Real chunk, not a health check.** `/api/health` (0.4 s) and a
+   validation-error request (0.25 s) prove nothing about compute. Send the
+   exact 40-flight body the browser sends (`render_test_40.json`) with
+   `curl -w "%{time_total} %{time_starttransfer} %{size_download}"`, twice
+   back to back so the second run is warm. `time_starttransfer` ≈ server
+   compute; the remainder is transfer.
+2. **Render API for the host's view** (`api.render.com/v1`):
+   `GET /services/{id}` (plan, region, autoDeploy), `/env-vars`,
+   `/metrics/memory` and `/metrics/cpu` per instance, `/events` (OOM kills
+   show here with `oomKilled.memoryLimit`).
+3. **Change one variable at a time:** `PUT /env-vars/ATC_GEN_WORKERS
+   {"value":"2"}`, `POST /deploys`, poll the deploy until `live`, re-run the
+   same chunk, re-read memory.
+4. **Gzip:** measure ratio and CPU per level locally on a real response
+   before choosing; verify on a local server that (a) `Content-Encoding:
+   gzip` appears only when the client sends `Accept-Encoding: gzip`, (b) the
+   body decodes to the same JSON, (c) CORS headers survive, (d) csv / geojson
+   / gpkg downloads still work; then deploy and compare plain vs gzip on the
+   live host.
+
+## 4. Changes
+
+| Change | Where | Why |
+|---|---|---|
+| `GZipMiddleware(minimum_size=1000, compresslevel=5)` | `api/server.py` | 4.9× smaller responses. Level 5 vs Starlette's default 9: 4.9× vs 5.0× ratio for 44 ms vs 133 ms CPU per 3 MB locally — CPU is the scarce resource on a small host |
+| `ATC_GEN_WORKERS` 1 → 2 on the Render service (env var, not code) | Render dashboard / API | 2.6× faster per chunk; memory 283 MB with 2 workers |
+
+Gzip level comparison (3.09 MB response): level 1 4.3× / 24 ms, level 3
+4.4× / 29 ms, level 5 4.9× / 44 ms, level 6 4.9× / 56 ms, level 9 5.0× /
+133 ms.
+
+## 5. Findings worth keeping
+
+- **Gzip helps size, not time, on a fast link.** From Bangkok to Singapore
+  the uncompressed 3.2 MB took ~0.2 s; the chunk is compute-bound (~21 s).
+  Gzip matters for slow client connections and for a self-hosted backend on
+  home upload bandwidth (240 MB → ~45 MB per 2,000-flight import).
+- **Render free CPU is not a strict 0.1-core quota.** The prediction that
+  more workers would only split the same allowance was wrong: 2 workers gave
+  2.6×. Measure before reasoning from published limits.
+- **Workers trade memory for speed.** Each worker adds a baseline; with 2
+  workers a full import runs out of the 512 MB sooner (~750 flights,
+  estimated) than with 1 (~1,070). Neither fits 2,000.
+- The service was created by hand, not from the Blueprint (`GET
+  /blueprints` → `[]`), so `render.yaml` env vars are NOT applied; the
+  dashboard values are the only ones that count.
+
+## 6. Bugs and gotchas hit
+
+| # | Problem | Cause | Fix / lesson |
+|---|---|---|---|
+| B26 | Test said gzip and plain responses differed | Windows Python opened the plain file with the Thai `cp874` codec and mangled `·` | Decode both as UTF-8 (`PYTHONIOENCODING=utf-8`, `open(..., encoding="utf-8")`) — B11/B16 again |
+| B27 | Python could not find files curl had written to `/tmp` | Git Bash's `/tmp` is not the folder Windows Python sees | Use a real Windows path (the scratchpad) for files shared between bash tools and Python |
+| B28 | Test runs did not grow the server's cache | The test body repeats the same 40 flights, so flight keys repeat and overwrite | A memory test needs distinct flight keys (a real import) |
+| B29 | First Vercel token could read but not create a project | Token created with limited scope (`"limited": true`) | Use a full-scope token |
+
+## 7. Still open
+
+- **The memory fix** (store the export bundle compactly or rebuild it on
+  download) — required for a 2,000-flight import on 512 MB, and it would let
+  workers go to 2–3 safely.
+- **Self-hosting the backend** on the user's PC via a Cloudflare Tunnel
+  (HTTPS required: an HTTPS page cannot call an `http://` API) — ~1 minute
+  for 1,990 flights; gzip then saves real upload time.
+- Finer progress feedback (smaller chunks or per-flight progress) so a slow
+  host does not look frozen.
+
+## 8. Files touched
+
+`api/server.py` (gzip middleware). Render env var `ATC_GEN_WORKERS=2`.
+pytest 15 passed. Commit `4aaea05`, deployed to Render (`dep-davat6oae00c73db2me0`).
