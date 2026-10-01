@@ -41,3 +41,12 @@ aixm_export_*.xml.gz
 # Both hold run output, not source.
 /csv/
 /graphs/
+
+# Desktop build outputs (PyInstaller, Tauri, static export)
+desktop/sidecar/dist/
+desktop/sidecar/build/
+desktop/src-tauri/target/
+web/.next-desktop/
+web/out/
+desktop/node_modules/
+desktop/src-tauri/gen/

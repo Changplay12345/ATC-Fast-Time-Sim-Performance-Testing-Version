@@ -429,3 +429,84 @@ A, B and C are recorded in section 0. Nothing blocks Phase 0.
 | Visual design | None needed; reuses the web app's components, stylesheet and night-radar console guide | — |
 
 Nothing blocks Phase 0.
+
+## 12. Phase 0 results — spike complete (2026-10-02)
+
+Built and measured on the development PC (Windows 11 Pro 26100, Ryzen 7
+9800X3D, RTX 4070, WebView2 154). Toolchain installed for it: Rust 1.99
+(rustup), Visual Studio 2022 Build Tools C++ workload (MSVC 14.44),
+PyInstaller 6.22.3, Tauri CLI 2.12.1.
+
+### Exit criteria
+
+| Criterion | Result |
+|---|---|
+| Packaged engine generates the 1,990-flight day with no Python on the machine | **Met in part.** The PyInstaller build ran with a stripped environment (no venv, no `PYTHONPATH`, only `System32` on `PATH`) and from the installed location; all 1,983 flights generated in **23 s** through the desktop window. Not yet run on a separate clean VM — carry to Phase 1's smoke test |
+| Map pans at ≥ 60 fps in WebView2 | **Met.** 178.6 fps average, p95 5.6 ms, p99 5.7 ms, worst frame 28 ms, no long tasks, with 1,983 flights loaded — the same as Chrome. WebGL2 available |
+| Installer prototype ≤ 110 MB | **Met: 56.1 MB** (NSIS, per-user). 206 MB installed. Silent install took 5 s, no admin prompt, Start-menu entry created |
+| No Python or Node needed by the user | **Met.** The installed app started its own engine in 1.5 s and generated a flight |
+
+### Measurements
+
+| Item | Value |
+|---|---|
+| Engine folder (PyInstaller one-folder) | 193 MB: navdata 42 MB, pandas 18, pyproj 17, pyogrio 13, numpy 7, the rest Python + DLLs |
+| Shell executable (front end embedded) | 17.1 MB |
+| Engine start, cold | 1–2 s to `/api/health` |
+| Memory at rest | shell 43 MB + engine 103 MB (+ WebView2 processes) |
+| Memory after a 2,000-flight import | engine + 7 workers = **1,480 MB** |
+| One 40-flight chunk, frozen engine | 1.5 s, 7 workers |
+| Output, frozen vs venv on the same machine | **Identical** (40 flights, every field) |
+| Output, Windows vs Render (Linux) | Differs only in the last float digit of lat/lon/track (1e-15) — maths-library noise, not packaging |
+| Shutdown | Closing the window stops the engine and all workers; port released. Killing the engine process alone also takes its workers with it in < 1.5 s |
+
+### What the spike built (committed under `desktop/`)
+
+- `sidecar/engine_main.py` — entry point; `multiprocessing.freeze_support()`
+  first, then uvicorn on `ATC_BIND`:`ATC_PORT`.
+- `sidecar/engine.spec` — one-folder, UPX off; bundles `web/public/data`,
+  `trajectory_sim/data`, the thresholds CSV, and pyogrio's `gdal_data` /
+  `proj_data` (pyogrio has no PyInstaller hook).
+- `src-tauri/` — Tauri 2 shell: starts the engine hidden, waits for its port,
+  then creates the window; logs to `%LOCALAPPDATA%\th.co.bearcat.atcfts\logs`;
+  stops the engine on exit. NSIS per-user bundle with the engine as a resource.
+- `web/next.config.mjs` — `DESKTOP_BUILD=1` switches on `output: "export"`
+  (written to `web/.next-desktop/`); the Vercel build is unchanged.
+
+Build, from the repo root:
+
+```
+python -m PyInstaller --noconfirm --clean desktop/sidecar/engine.spec --distpath desktop/sidecar/dist --workpath desktop/sidecar/build
+cd web && DESKTOP_BUILD=1 NEXT_DIST_DIR=.next-desktop NEXT_PUBLIC_API_BASE=http://127.0.0.1:8765 npx next build
+cd ../desktop && npx tauri build      # needs %USERPROFILE%\.cargo\bin on PATH
+```
+
+### Findings that change Phase 1
+
+| Finding | Consequence |
+|---|---|
+| The static export copies `public/data` (42 MB) and the engine bundles the same folder | De-duplicate: ship it once (the data pack) and have the front end fetch its one static file from the engine, or exclude `data/` from the export. Saves ~40 MB installed |
+| `proj.db` is bundled twice (pyproj and pyogrio) | Keep one; point `PROJ_DATA` at it. ~9 MB |
+| `api/server.py` writes exports to `_ROOT/api/_outputs`, which is inside the install folder | Move to the user data folder (`ATC_OUT_DIR`) — an install under Program Files would not be writable, and uninstall would delete user exports |
+| The spike uses a fixed port (8765) baked into the front end, and reuses whatever is already listening there | Phase 1 as planned: random port, session token, runtime config, PID file |
+| The engine's CORS allow-list needed `WEB_ORIGIN=http://tauri.localhost` | Phase 1 drops CORS in local mode instead |
+| 1.48 GB after a full import with 7 workers | Size the pool from free RAM as well as cores on 8 GB machines; the server-side memory fix (PERFORMANCE_NOTES Part 4) matters here too |
+| Stacked route badges at busy airports overlap into unreadable blocks | Cosmetic, same as the web build; consider collision filtering on the GPU text layer |
+| Windows shows the SmartScreen prompt for the unsigned installer | As decided; document it on the download page |
+
+### Gotchas hit
+
+| Problem | Cause | Fix |
+|---|---|---|
+| `tauri build` failed: "cargo: program not found" | A fresh rustup install is not on the current session's PATH, and a Git Bash `PATH` entry built from `%USERPROFILE%` is not resolved | Prepend `%USERPROFILE%\.cargo\bin` in PowerShell before building |
+| Git's `link.exe` is not a linker | Git Bash ships a Unix `link` | Install the VS Build Tools C++ workload; cargo finds MSVC itself |
+| Next's static export was not in `out/` | With a custom `distDir`, the export is written there | `frontendDist` points at `web/.next-desktop` |
+| PyInstaller warned "Datas for pyproj not found" and errored on `pyogrio.tests.*` hidden imports | Harmless: `proj.db` is collected, and the test modules are excluded on purpose | Narrow `collect_submodules("pyogrio")` to skip tests |
+| `tauri icon` does not accept `.ico` | It wants a PNG or SVG master | Extract the 256 px image and upscale to 1024 (`desktop/icons/app-1024.png`) until a real master exists |
+| The window could open before the engine answered | Windows declared in `tauri.conf.json` are created before `setup` | Create the window in code after the engine's port is open |
+
+### State left on the development PC
+
+The spike build is **installed** per-user at
+`%LOCALAPPDATA%\ATC Fast-Time Simulation Tool` (Start menu → "ATC Fast-Time
+Simulation Tool"). Uninstall from Settings → Apps, or run `uninstall.exe` there.

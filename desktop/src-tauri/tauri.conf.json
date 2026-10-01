@@ -1,0 +1,42 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "ATC Fast-Time Simulation Tool",
+  "version": "0.1.0",
+  "identifier": "th.co.bearcat.atcfts",
+  "build": {
+    "frontendDist": "../../web/.next-desktop",
+    "devUrl": "http://localhost:3000"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "BearCat AEL Co",
+    "copyright": "Copyright (c) 2026 BearCat AEL Co. All rights reserved.",
+    "shortDescription": "Air-traffic fast-time simulation and trajectory generation",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../sidecar/dist/atc-engine/": "engine/"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English"]
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    }
+  }
+}
