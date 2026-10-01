@@ -35,6 +35,9 @@ interface EngineHealth {
 }
 
 const SUPPORT_EMAIL = "kruammek@bearcat.co.th";
+/** This build's release notes (RELEASE_NOTES.md, inlined by desktop/build.ps1),
+ *  so after an update the user can see what it brought. */
+const WHATS_NEW = (process.env.NEXT_PUBLIC_RELEASE_NOTES ?? "").trim();
 
 function statusLine(u: DesktopUpdate): string {
   switch (u.status) {
@@ -164,6 +167,15 @@ export default function AboutDialog({ onClose, update, busy }: Props) {
               </p>
             )}
           </div>
+
+          {WHATS_NEW && (
+            <div className="about-new">
+              <p className="about-new-title">
+                What&apos;s new in {info?.version ?? BACKEND.version ?? "this version"}
+              </p>
+              <pre className="about-notes">{WHATS_NEW}</pre>
+            </div>
+          )}
 
           <div className="about-support">
             <button type="button" className="about-btn" onClick={() => void openLogsFolder()}>

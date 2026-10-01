@@ -12656,3 +12656,16 @@ select.fp-input {
 .about-foot a {
   color: var(--accent-ink);
 }
+.about-new {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.about-new-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-ink);
+}

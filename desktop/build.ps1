@@ -61,9 +61,11 @@ if (-not $SkipWeb) {
       # only the fallback baked into the bundle.
       $env:NEXT_PUBLIC_API_BASE = "http://127.0.0.1:8765"
       $env:NEXT_PUBLIC_APP_VERSION = (Get-Content (Join-Path $repo "VERSION")).Trim()
+      # Shown in the About dialog as "What's new in this version".
+      $env:NEXT_PUBLIC_RELEASE_NOTES = (Get-Content (Join-Path $repo "RELEASE_NOTES.md") -Raw).Trim()
       npx next build
     } finally {
-      Remove-Item Env:DESKTOP_BUILD, Env:NEXT_DIST_DIR, Env:NEXT_PUBLIC_API_BASE, Env:NEXT_PUBLIC_APP_VERSION -ErrorAction SilentlyContinue
+      Remove-Item Env:DESKTOP_BUILD, Env:NEXT_DIST_DIR, Env:NEXT_PUBLIC_API_BASE, Env:NEXT_PUBLIC_APP_VERSION, Env:NEXT_PUBLIC_RELEASE_NOTES -ErrorAction SilentlyContinue
       Pop-Location
     }
   }
