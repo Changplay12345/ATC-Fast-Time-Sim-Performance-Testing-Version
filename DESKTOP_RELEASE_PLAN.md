@@ -601,3 +601,35 @@ the published 0.2.1. The check runs 3 s after launch and hourly.
   `TAURI_SIGNING_PRIVATE_KEY` secret) must be backed up. Without it no
   installed app can ever be updated again.
 - Every push to `main` also redeploys the hosted API (Render) and site (Vercel).
+
+## 15. Where work stopped (2026-10-02, end of session)
+
+**State**
+
+- `main` is at the replication-playbook commit; working tree clean.
+- Published: `v0.2.0`, `v0.2.1`. `v0.2.2` (update banner, hourly check) was
+  tagged and its CI release run was still building when the session ended.
+- This PC has **0.2.1 installed** (updated from 0.2.0 by the app itself).
+- Hosted: Vercel site and Render API (free plan, 2 workers) are live and on
+  the current `main`.
+
+**Next, in order**
+
+1. Confirm the `v0.2.2` run finished green and the release is published
+   (`gh run list --workflow desktop`, `gh release list`).
+2. Update the installed 0.2.1 to 0.2.2 from its About dialog — a second real
+   update, and it leaves this PC on a version that has the banner. From then
+   on a new release announces itself.
+3. Record that result in section 14.
+4. Remaining Phase 1 items: third-party licence notices; ship the 42 MB of
+   map data once instead of twice; look at the installer's licence page in an
+   interactive install.
+5. Then Phase 2 (data packs).
+
+**Loose ends**
+
+- `.github/workflows/keepalive.yml` pings `trajectory-api-zf51.onrender.com`,
+  an older Render service, not the one deployed this week. Decide which
+  should be kept awake.
+- The hosted API still cannot hold a 2,000-flight import in 512 MB.
+- Back up `%USERPROFILE%\.tauri\atc-fts-updater.key`.
