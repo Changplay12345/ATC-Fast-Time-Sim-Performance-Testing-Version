@@ -417,15 +417,15 @@ data folder*, *View licences*.
 
 A, B and C are recorded in section 0. Nothing blocks Phase 0.
 
-## 11. What the project needs from BearCat AEL before Phase 1 ships
+## 11. Inputs from BearCat AEL — received 2026-10-02
 
-- **An app icon**: one square master image of at least 1024×1024 (PNG or
-  SVG). CI derives the `.ico`, `.icns` and PNG sizes from it.
-- **Sign-off on the EULA and privacy text** (drafted in Phase 1 from
-  templates, with BearCat AEL Co as the licensor).
-- **A support contact** (email or URL) for the About box and the installer.
-- **No new visual design.** The desktop app reuses the web app's components,
-  stylesheet and the night-radar console guide; the only new screens — About,
-  Settings (telemetry toggle, data folder), the update badge and prompt, the
-  first-run EULA, and data-update status — are built with the existing design
-  tokens.
+| Input | Status | Where |
+|---|---|---|
+| App icon | Received: 6-size ICO up to 256x256 (Windows maximum). A 1024x1024 master would sharpen the macOS Dock icon on Retina; optional | `desktop/icons/app.ico` |
+| Support contact | kruammek@bearcat.co.th | `desktop/brand.json` |
+| Publisher identity | BearCat AEL Co; bundle identifier `th.co.bearcat.atcfts` | `desktop/brand.json` |
+| EULA | Basic draft with standard terms (licence, restrictions, data disclaimer, no warranty, Thai law). Marked as a placeholder for BearCat to edit before public release | `EULA.md` |
+| Privacy text | To be drafted in Phase 1 alongside the opt-in crash-report toggle | `PRIVACY.md` (Phase 1) |
+| Visual design | None needed; reuses the web app's components, stylesheet and night-radar console guide | — |
+
+Nothing blocks Phase 0.

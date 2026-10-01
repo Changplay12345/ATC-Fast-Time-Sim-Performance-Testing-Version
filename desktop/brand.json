@@ -1,0 +1,13 @@
+{
+  "$comment": "The one place the product identity lives. CI templates these values into the installer, tauri.conf.json, the EULA header and the About box (DESKTOP_RELEASE_PLAN.md, decision C). Change here, release once.",
+  "productName": "ATC Fast-Time Simulation Tool",
+  "shortName": "ATC FTS",
+  "publisher": "BearCat AEL Co",
+  "copyright": "Copyright (c) 2026 BearCat AEL Co. All rights reserved.",
+  "supportEmail": "kruammek@bearcat.co.th",
+  "supportUrl": "mailto:kruammek@bearcat.co.th",
+  "homepage": "https://atc-fast-time-sim.vercel.app",
+  "identifier": "th.co.bearcat.atcfts",
+  "icon": "desktop/icons/app.ico",
+  "iconNote": "256x256 maximum; a 1024x1024 master would sharpen the macOS Dock icon on Retina displays."
+}
