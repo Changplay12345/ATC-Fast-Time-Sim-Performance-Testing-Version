@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "ATC Fast-Time Simulation Tool",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "identifier": "th.co.bearcat.atcfts",
   "build": {
     "frontendDist": "../../web/.next-desktop",
@@ -43,7 +43,8 @@
         "type": "downloadBootstrapper"
       }
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "licenseFile": "../installer/EULA.txt"
   },
   "plugins": {
     "updater": {

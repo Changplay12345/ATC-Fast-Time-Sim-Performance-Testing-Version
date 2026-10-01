@@ -1,5 +1,6 @@
-First desktop release.
+Version 0.2.1
 
-- Runs the simulation engine on your own computer: a 2,000-flight day generates in about half a minute.
-- The engine listens only on this machine and only answers this app.
-- Checks for updates automatically; install them from the About dialog.
+- The installer now shows the licence agreement.
+- The number of generation workers adapts to the free memory, so the app stays stable on computers with 8 GB of RAM.
+- Clearer message when the update server cannot be reached.
+- Added a privacy statement (PRIVACY.md).

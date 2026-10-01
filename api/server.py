@@ -24,6 +24,7 @@ import multiprocessing
 import multiprocessing.connection
 import os
 import re
+import sys
 import tempfile
 import threading
 import zipfile
@@ -3097,14 +3098,98 @@ def generate_batch(req: BatchRequest) -> dict[str, object]:
 # payload and re-registered in THIS process, so the download, /api/extend,
 # /api/recache and conflict-mark endpoints find it exactly as before.
 #
-# $ATC_GEN_WORKERS sets the pool size: unset = auto (cores - 1, at most 8);
-# 0 or 1 = serial, the old behaviour. A small host (Render's free plan) must
-# stay serial — every worker holds its own copy of the navdata.
+# $ATC_GEN_WORKERS sets the pool size; 0 or 1 = serial, the old behaviour.
+# Unset = auto: cores - 1, at most 8, and no more than the free memory can
+# carry — every worker holds its own copy of the navdata, so on a machine (or a
+# container) with little memory to spare the right number is small, down to
+# serial. See `_auto_workers`.
 _GEN_POOL: "ProcessPoolExecutor | None" = None
 _GEN_POOL_LOCK = threading.Lock()
 #: Below this many flights a batch runs inline: fanning out costs more than it
 #: saves, and the first batch would pay for starting the workers.
 _PARALLEL_MIN_FLIGHTS = 4
+
+
+#: Memory one generation worker needs at its peak (navdata + a chunk's
+#: trajectories in flight), and what is left alone for everything else: the
+#: server's own flight cache (~0.37 MB a flight, so ~750 MB for a traffic day)
+#: and, on a desktop, the app's own window.
+_WORKER_RAM_MB = 250
+_RESERVED_RAM_MB = 1000
+
+
+def _available_ram_mb() -> "float | None":
+    """Free physical memory in MB, or None where it cannot be read.
+
+    Inside a container the kernel's figure is the HOST's memory, so the
+    cgroup limit is honoured too — a 512 MB instance on a 64 GB host has
+    512 MB, whatever /proc/meminfo says.
+    """
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            class _MemoryStatus(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            status = _MemoryStatus()
+            status.dwLength = ctypes.sizeof(status)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+                return status.ullAvailPhys / 2**20
+            return None
+
+        candidates: list[float] = []
+        try:
+            with open("/proc/meminfo", encoding="ascii") as fh:
+                for line in fh:
+                    if line.startswith("MemAvailable:"):
+                        candidates.append(int(line.split()[1]) / 1024)
+                        break
+        except OSError:
+            pass
+        for limit_file, usage_file in (
+            ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory.current"),
+            (
+                "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+                "/sys/fs/cgroup/memory/memory.usage_in_bytes",
+            ),
+        ):
+            try:
+                limit = Path(limit_file).read_text(encoding="ascii").strip()
+                usage = Path(usage_file).read_text(encoding="ascii").strip()
+                if limit.isdigit() and usage.isdigit() and int(limit) < 2**60:
+                    candidates.append((int(limit) - int(usage)) / 2**20)
+            except OSError:
+                continue
+        return min(candidates) if candidates else None
+    except Exception:  # noqa: BLE001 — sizing a pool must never fail a request
+        return None
+
+
+@lru_cache(maxsize=1)
+def _auto_workers() -> int:
+    """Workers when $ATC_GEN_WORKERS is unset: bounded by cores AND free memory.
+
+    Decided once (the pool is created once): cores - 1 up to 8, but never more
+    than the memory left after the reserve can hold. With memory unreadable it
+    falls back to the core count alone.
+    """
+    by_cpu = max(1, min(8, (os.cpu_count() or 1) - 1))
+    available = _available_ram_mb()
+    if available is None:
+        return by_cpu
+    by_ram = int((available - _RESERVED_RAM_MB) // _WORKER_RAM_MB)
+    return max(1, min(by_cpu, by_ram))
 
 
 def _gen_workers() -> int:
@@ -3114,7 +3199,7 @@ def _gen_workers() -> int:
             return max(1, int(raw))
         except ValueError:
             pass
-    return max(1, min(8, (os.cpu_count() or 1) - 1))
+    return _auto_workers()
 
 
 def _gen_pool() -> "ProcessPoolExecutor | None":

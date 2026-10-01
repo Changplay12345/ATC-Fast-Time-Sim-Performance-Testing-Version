@@ -36,6 +36,10 @@ Step "version check" {
   & $python (Join-Path $repo "scripts\sync_version.py") --check
 }
 
+Step "installer licence text" {
+  & $python (Join-Path $repo "scripts\make_installer_license.py")
+}
+
 if (-not $SkipEngine) {
   Step "engine (PyInstaller)" {
     Push-Location $repo

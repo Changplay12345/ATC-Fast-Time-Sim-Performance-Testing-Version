@@ -53,3 +53,6 @@ desktop/src-tauri/gen/
 
 # Assembled desktop release (installer + latest.json), uploaded to GitHub Releases
 release/
+
+# Generated from EULA.md by scripts/make_installer_license.py
+desktop/installer/EULA.txt
