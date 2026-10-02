@@ -311,11 +311,49 @@ minisign, zip) are in the tree, so data packs add no new packages. Build
 provider if nobody has (`rustls::crypto::ring::default_provider()`), or the
 first request panics.
 
+### C.5e Release control, supervision, diagnostics (no new services)
+
+- **Rollout + forced minimum in the update manifest.** Add `rollout` and
+  `min_supported` to `latest.json` and read them from the updater's
+  `raw_json` after `check()`. Each installation keeps one random number
+  0-99; offer the update when it is below `rollout`, or when the user asked,
+  or when the version is below `min_supported`. Treat missing or malformed
+  fields as "no restriction". Unit-test the decision as pure functions.
+- **Test it for real without burning releases:** build the new code stamped
+  with a version just below the published one (`VERSION` 0.3.9 against
+  release 0.4.0), run it, and change the policy on the real release with
+  the control script between probes. Restore `VERSION` afterwards
+  (`git checkout` the four stamped files).
+- **Halting = moving "latest".** With GitHub Releases: mark the previous
+  release `--latest` *first*, then mark the bad one `--prerelease`. In that
+  order "latest" never points at nothing (or at the data release).
+- **Supervise the child process.** Poll `try_wait()` from a thread; treat
+  "the handle is gone from our state" as a deliberate stop.
+- **Diagnostics a user can email.** Zip the logs plus a text summary;
+  rewrite the profile folder in every spelling a log uses (`\`, `/`, and
+  doubled backslashes from JSON); cap each log; never include user work.
+  Keep the previous run's engine log, or a crash erases its own evidence.
+- **An error box shown before the window exists must not need the event
+  loop.** Tauri's dialog plugin queues its box on the main loop; called from
+  the setup hook (which blocks that loop) it deadlocks, and the app hangs
+  with no window and no message. Draw it directly (`rfd::MessageDialog`,
+  already a dependency of the plugin) and exit. The plugin's dialog is fine
+  once the loop is running (the engine-died notice uses it).
+- **Give the engine a way to fail on demand** (`ATC_SELFTEST_FAIL_START`)
+  and make the smoke test use it. The start-failure path had shipped broken
+  in six releases because nothing ever exercised it.
+- **GitHub serves a changed release asset 1-2 minutes late**, and can hand
+  out the old copy once more after that. Scripts that change a published
+  manifest should wait until the public URL shows the change; tests that
+  follow a change should wait a few minutes or retry.
+
 ### C.6 Build, smoke test, CI
 
 - `desktop/build.ps1`: version check → licence text → freeze engine → static
   export → `tauri build` (signed updater artifacts) → release folder.
-- `desktop/smoke.ps1`: three launches. (1) engine started, loopback only,
+- `desktop/smoke.ps1`: five launches (4: the engine is killed under the
+  app, which must notice and say so; 5: the engine cannot start, the app
+  must say so and exit). The first three: (1) engine started, loopback only,
   health, version match, local mode, 401 without token, docs off, the window
   opens, closing it ends the app and the engine; (2) the app still ends when
   its internal helper window is closed first; (3) the engine dies when the
@@ -354,6 +392,23 @@ git tag v<version> && git push origin main v<version>
 
 CI takes ~20 minutes and publishes the installer and `latest.json`.
 Installed apps find it within the hour, or at next launch.
+
+**Release gradually, require, or halt**
+
+```
+# before tagging: desktop/release.json  {"rollout": 10, "min_supported": ""}
+python scripts/release_control.py status
+python scripts/release_control.py rollout 50      # widen; 100 = everybody
+python scripts/release_control.py require 0.4.1   # versions below must update
+python scripts/release_control.py require none
+python scripts/release_control.py halt            # bad release: stop offering it
+python scripts/release_control.py resume --tag v0.4.1
+```
+
+Changes reach a running app at its next check (3 s after launch, then
+hourly). A halted release stays installed where it already is; ship a fix.
+Reset `desktop/release.json` to `rollout: 100` unless the next release is
+also meant to be staged.
 
 **Ship new navigation data** (no new installer)
 
@@ -452,6 +507,15 @@ looked at (a screenshot), not inferred.
 10. **Do not discard a return value or a handle in a test command.** The
     failing close was `[void]$app.CloseMainWindow()`; printing the handle and
     its title would have shown the wrong window immediately.
+11. **A failing test is information even when the test is wrong.** The
+    engine-died check failed because it raced the start-up - and the state
+    it produced by accident was a real, six-release-old hang. Look at what
+    the system did before fixing the test.
+12. **Test every failure path once, on purpose.** "Shows an error and
+    exits" had been written, reviewed and never run.
+13. **Measure the delivery path's delay before relying on it.** A "halt"
+    that takes effect after the cache expires is still a halt, but the
+    runbook has to say two to five minutes, not "immediately".
 
 ---
 
@@ -467,6 +531,9 @@ looked at (a screenshot), not inferred.
 | `scripts/build_data_pack.py`, `.github/workflows/data.yml` | Build, sign and publish a data pack |
 | `desktop/src-tauri/src/datapack.rs`, `desktop/datapack_e2e.py` | Shell side of data packs and its end-to-end test |
 | `web/components/desktop/DataBanner.tsx` | "New navigation data is ready" notice |
+| `desktop/src-tauri/src/release.rs`, `desktop/release.json`, `scripts/release_control.py` | Staged rollout, forced minimum version, halt/resume |
+| `web/components/desktop/RequiredUpdate.tsx` | The screen for a mandatory update |
+| `desktop/src-tauri/src/diagnostics.rs` | About > Export diagnostics |
 | `desktop/brand.json`, `desktop/icons/` | Product identity in one place |
 | `web/lib/backend.ts` (+ test) | Runtime engine address and token; the `apiFetch` guard test |
 | `web/lib/desktop.ts`, `web/components/desktop/*` | Shell bridge, update hook, About dialog, update banner |

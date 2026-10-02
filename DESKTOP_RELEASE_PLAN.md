@@ -843,18 +843,153 @@ Phase 2's exit criteria are met: a pack reaches an installed app without an
 app update; corrupted packs are rejected; the token header is plumbed and
 unused.
 
-## 17. Where work stands
+## 17. Phase 4a: hardening that needs no new accounts (0.4.0, 0.4.1)
 
-**Done and verified in public:** Phases 0, 1 and 2. Releases v0.2.0 to
-v0.3.0; four consecutive real self-updates; one data pack delivered.
+macOS (Phase 3) is blocked on an Apple Developer account, so Phase 4 was
+started first, with the parts that need no new service.
 
-**Phase 3 (macOS Apple Silicon), next:** needs an Apple Developer account
-(US$99/year) and a Mac or a macOS runner. **Phase 4:** hardening (staged
-rollout, kill-switch, crash reports, accounts on the data service).
+### What was built
 
-**Small things queued for the next release:** the About hint under an
-available update now says the app updates itself with no installer to click
-through (the old text said Windows would ask to confirm, which it does not).
+| Item | Where | How it works |
+|---|---|---|
+| Staged rollout | `desktop/src-tauri/src/release.rs`, `latest.json` field `rollout` (0-100) | Each installation draws a number 0-99 once (`install-bucket` in the data folder). The background check offers an update only when that number is below `rollout`. "Check for updates" in About is never held back. Raising the figure only adds installations |
+| Forced update | `latest.json` field `min_supported`; `web/components/desktop/RequiredUpdate.tsx` | A version below the minimum gets a screen that cannot be dismissed, with one button: Install and restart. Overrides the rollout. For critical fixes only |
+| Halt a bad release | `scripts/release_control.py halt` | Marks the previous release "latest" and the bad one a pre-release: nobody is offered it any more. `resume --tag` undoes it. No downgrade for those who already have it: follow with a fixed release |
+| Change policy after publishing | `scripts/release_control.py rollout N`, `require X`, `status` | Downloads `latest.json` from the release, edits it, uploads it back. Possible because the manifest is not signed (the installer is) |
+| Policy at build time | `desktop/release.json`, read by `scripts/make_update_manifest.py` | Validated: rollout 0-100; `min_supported` may not be newer than the release itself |
+| Engine supervision | `watch_engine` in `lib.rs` | A thread checks the engine process every second. If it has exited and was not stopped on purpose: log, event `engine-down`, native dialog "Restart now / Not now" |
+| Diagnostics export | `desktop/src-tauri/src/diagnostics.rs`, About > Export diagnostics | `diagnostics_<UTC time>.zip` in the exports folder: summary (versions, Windows version, WebView2 version, processors, update group, engine health, data status) and the last 2 MB of each log. The profile folder is rewritten to `%USERPROFILE%`. Nothing is sent |
+| Logs | `lib.rs` | Shell log rotates at 5 MB, keeps 3. `engine.log` of the previous run is kept as `engine.previous.log` (it is the one that explains a crash) |
+
+### Decisions
+
+- **Rollout and minimum version live in the manifest, decided by the app**,
+  not by a server choosing per request. It needs no server, and the
+  installation's number never leaves the machine. The Cloudflare Worker of
+  section 3.1 would give exact percentages and statistics; this gives the
+  control without the infrastructure. The fields are not a security
+  boundary: a forged manifest can only offer or insist on an update that
+  must still carry our signature and be newer.
+- **A manual check ignores the rollout.** Someone asking for the update gets
+  it; after that the background check asks the same way, so the update they
+  were shown does not vanish an hour later.
+- **Old apps ignore the new fields** (0.3.0 and earlier update as before),
+  so the first release carrying them needs no special handling.
+- **A dead engine is reported, not silently replaced.** The engine holds the
+  session's generated flights in memory; restarting it behind the user's
+  back would leave a window full of flights the engine no longer knows.
+- **Not done, needs an account or a decision:** opt-in crash reporting
+  (Sentry), the R2 + Worker update host, "reinstall previous version",
+  hybrid mode, antivirus false-positive submissions, a Windows 10 test.
+
+### Verified
+
+**Automated.** 13 shell unit tests (release policy 5, diagnostics 3, data
+packs 5). Smoke test, now 15 checks over five launches. Data-pack end-to-end
+test 13/13. All three run on the clean Windows runner before a release is
+published; v0.4.0 and v0.4.1 both passed.
+
+**Release control against the live release.** A copy of the 0.4.0 code
+stamped 0.3.9 was run against the published v0.4.0 while the policy was
+changed with `scripts/release_control.py`. This installation's number is 79.
+
+| Live manifest | Background check | Asked by hand | On screen |
+|---|---|---|---|
+| rollout 100 | offered | offered | "Version 0.4.0 is available" banner |
+| rollout 79 (just outside) | held back | offered | no update banner |
+| rollout 80 (just inside) | offered | offered | banner |
+| rollout 0, `min_supported` 0.4.0 | offered, **required** | required | "Update required" screen; Escape and clicking outside do nothing |
+| `require 0.5.0` on v0.4.0 | refused by the script: nobody could reach it | | |
+| `halt` | no update (served v0.3.0 again; v0.4.0 marked pre-release) | no update | nothing |
+| `resume --tag v0.4.0` | offered | offered | banner |
+
+**How fast a change reaches apps (measured).** GitHub serves release assets
+through a cache.
+
+- Polling the public URL: the new manifest first appeared 66-123 s after
+  the change (8 changes).
+- An app checking every 3 s saw one clean switch, 72 s and 10 s after two
+  changes (93 checks each, no flapping).
+- An app whose previous check was about two minutes earlier got the *old*
+  manifest once, and the new one 4 s later (seen four times): a cache
+  serving its stale copy once while it refreshes.
+- An app that had not checked for 4 minutes, and for 10 minutes, got the new
+  manifest on its first check.
+
+So a rollout change, a required version or a halt is in force for every app
+within about two to five minutes of the command, at that app's next check
+(3 s after launch, then hourly). `release_control.py` now waits until the
+public URL serves the change and prints how long it took.
+
+**Fifth real update, 0.3.0 -> 0.4.0** on the installed copy: banner after
+2 s, download, closed after 9 s, back by itself as 0.4.0. The 0.3.0 app
+ignored the new manifest fields, as intended.
+
+**Diagnostics export** in the installed 0.4.0: `diagnostics_<time>.zip`,
+4 KB, with `summary.txt` and three logs; 0 files contained the profile path.
+
+**Bug found by the smoke test: a silent hang when the engine cannot start.**
+
+- *Symptom.* The new "app notices when its engine dies" check failed on the
+  0.4.1 build though it had passed on 0.4.0.
+- *Investigation.* Reproduced by hand three times out of three: the test
+  killed the engine the moment its port opened, i.e. while the shell was
+  still starting it. The shell logged "The simulation engine stopped while
+  starting" - and then stayed alive with no window and no error box.
+- *Cause.* `fatal()` showed its box with the dialog plugin from a helper
+  thread and waited for it. The plugin queues the box on the app's event
+  loop (`run_on_main_thread`), which does not run until the setup hook
+  returns - and the setup hook was the one waiting. A deadlock, in every
+  release up to 0.4.0: any engine start failure (files quarantined by an
+  antivirus, a crash at import) left an invisible process.
+- *Fix.* The box is drawn directly with `rfd::MessageDialog` on the setup
+  thread (its own message loop, no event loop needed), then
+  `std::process::exit(1)`. `rfd` was already in the tree.
+- *Test.* `ATC_SELFTEST_FAIL_START=1` makes the engine exit at once; the
+  smoke test starts the app with it and checks that a box appears and that
+  the app exits when OK is pressed. The engine-died check now waits for the
+  window first, so it tests what it names, and also checks a box appears.
+  The box's text was read back through UI Automation: the reason, the path
+  of `engine.log`, and what to do.
+
+**An update banner that did not appear, once.** On the first launch of the
+0.3.9 test copy the page's first update check left no trace in the log and
+no banner; six later launches showed the banner 3.6-4.1 s after start. Not
+reproduced and not explained. Handling added in 0.4.1: a failed check is
+logged with its reason, and a failed background check is retried after 30 s,
+2 min and 10 min instead of an hour later (the data check likewise, after
+5 minutes, three times).
+
+**Slow exit on the runner.** A normal close took 2.0-3.3 s on the CI runner
+(0.27 s on the development PC). The window watcher's grace was 3 s, close
+enough to cut a slow normal exit short; it is now 6 s.
+
+**A real staged rollout, 0.4.1 on the installed 0.4.0.** v0.4.1 was
+published with `desktop/release.json` at `rollout: 0`.
+
+1. Installed 0.4.0 (number 79), release at 0 %: no banner; background check
+   "held back"; "Check for updates" by hand offered 0.4.1.
+2. `python scripts/release_control.py rollout 100`: "apps are being served
+   the change after 114 s".
+3. The first page check 20 s later still got the cache's stale copy (no
+   update banner yet); the next launch showed "Version 0.4.1 is available"
+   2 s after start.
+4. Install: download, closed after 9 s, back by itself as 0.4.1 (sixth
+   consecutive real self-update), "up to date", and running on the
+   downloaded data pack `2026.09.03.2`.
+
+`desktop/release.json` is back at `rollout: 100` for the next release.
+
+## 18. Where work stands
+
+**Done and verified in public:** Phases 0, 1, 2 and the account-free part of
+Phase 4. Releases v0.2.0 to v0.4.1; six consecutive real self-updates on
+the development PC, which now runs the installed 0.4.1 on data pack
+`2026.09.03.2`.
+
+**Blocked on the owner:** Phase 3 (macOS) needs an Apple Developer account
+(US$99/year) and a Mac or macOS runner. Crash reporting needs a Sentry
+account; the Worker update host needs a Cloudflare account.
 
 **Loose ends**
 
