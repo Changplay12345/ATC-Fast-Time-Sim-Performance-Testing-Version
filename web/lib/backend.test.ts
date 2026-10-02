@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { authHeaders, resolveBackend, withToken } from "./backend";
+import { authHeaders, dataUrl, resolveBackend, withToken } from "./backend";
 
 describe("resolveBackend", () => {
   it("is hosted, from the build-time address, when nothing is injected", () => {
@@ -80,6 +80,37 @@ describe("every engine call carries the session token", () => {
       const src = readFileSync(resolve(__dirname, "..", f), "utf8");
       const bare = src.match(/(?<![A-Za-z.])fetch\(/g) ?? [];
       expect(bare).toEqual([]);
+    });
+  }
+});
+
+describe("static data", () => {
+  const local = { mode: "local" as const, apiBase: "http://127.0.0.1:5000", token: "t" };
+  const hosted = { mode: "hosted" as const, apiBase: "https://api.example.com" };
+
+  it("comes from the site on the web", () => {
+    expect(dataUrl("/data/fir.geojson", hosted)).toBe("/data/fir.geojson");
+  });
+
+  it("comes from the engine on desktop", () => {
+    expect(dataUrl("/data/fir.geojson", local)).toBe("http://127.0.0.1:5000/data/fir.geojson");
+  });
+
+  it("leaves other URLs alone on desktop", () => {
+    expect(dataUrl("/favicon.ico", local)).toBe("/favicon.ico");
+    expect(dataUrl("https://tiles.example/1/2/3.png", local)).toBe("https://tiles.example/1/2/3.png");
+  });
+
+  // The desktop build ships no `data/` folder in its front end, so a plain
+  // fetch("/data/...") there is a 404. Every data module must use dataFetch.
+  const modules = [
+    "lib/aip.ts", "lib/aipRoutes.ts", "lib/atcLayers.ts", "lib/geojson.ts",
+    "lib/holdings.ts", "lib/pdr/airwayDirection.ts", "lib/pdr/areas.ts", "lib/runwayDefault.ts",
+  ];
+  for (const f of modules) {
+    it(`${f} has no bare fetch()`, () => {
+      const src = readFileSync(resolve(__dirname, "..", f), "utf8");
+      expect(src.match(/(?<![A-Za-z.])fetch\(/g) ?? []).toEqual([]);
     });
   }
 });

@@ -10,6 +10,8 @@
  * is taken verbatim from the AIP data.
  */
 
+import { dataFetch } from "@/lib/backend";
+
 export interface Holding {
   ident: string;
   lat: number;
@@ -39,7 +41,7 @@ export async function fetchHoldings(): Promise<Map<string, Holding>> {
   if (_cache) return _cache;
   const m = new Map<string, Holding>();
   try {
-    const res = await fetch(HOLDINGS_URL, { cache: "force-cache" });
+    const res = await dataFetch(HOLDINGS_URL, { cache: "force-cache" });
     if (!res.ok) return m;
     const gj = (await res.json()) as {
       features?: {
@@ -229,7 +231,7 @@ async function getJson(url: string): Promise<{
   }[];
 } | null> {
   try {
-    const res = await fetch(encodeURI(url), { cache: "no-cache" });
+    const res = await dataFetch(encodeURI(url), { cache: "no-cache" });
     if (!res.ok) return null;
     return await res.json();
   } catch {

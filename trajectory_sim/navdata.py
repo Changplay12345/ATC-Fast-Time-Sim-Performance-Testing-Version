@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import math
+import threading
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -97,6 +98,8 @@ class NavData:
         # still landable. Same DFD waypoint schema as the PBN source.
         self._ils_source = Path(ils_source) if ils_source else None
         self._proc_loaded = False
+        # Guards the one-time build of `_proc_index` (see `_load_procedures`).
+        self._proc_lock = threading.Lock()
         # (airport, ProcedureType, procedure_name) -> list[_RawLeg], ordered
         # by seqno. Built on first procedure lookup.
         self._proc_index: dict[
@@ -296,18 +299,30 @@ class NavData:
         return None
 
     def _load_procedures(self) -> None:
-        """Lazily read + index the SID / STAR / approach sources (once)."""
+        """Lazily read + index the SID / STAR / approach sources (once).
+
+        Thread-safe: the API serves requests on a thread pool, and a fresh
+        engine gets its first procedure requests together (the page asks for
+        an airport's list and a procedure's legs at once). The flag used to be
+        set BEFORE the index was built, so the second request saw "loaded",
+        searched a half-built index and answered "not found". Now the index is
+        built under a lock and published only when complete; a request that
+        arrives meanwhile waits for it.
+        """
         if self._proc_loaded:
             return
-        self._proc_loaded = True
-        for proc_type in ProcedureType:
-            gdf = self._read_proc_source(proc_type)
-            if gdf is None or len(gdf) == 0:
-                continue
-            self._index_proc_layer(proc_type, gdf)
-        # Each procedure's legs must be in published sequence order.
-        for legs in self._proc_index.values():
-            legs.sort(key=lambda lg: lg.seqno)
+        with self._proc_lock:
+            if self._proc_loaded:
+                return
+            for proc_type in ProcedureType:
+                gdf = self._read_proc_source(proc_type)
+                if gdf is None or len(gdf) == 0:
+                    continue
+                self._index_proc_layer(proc_type, gdf)
+            # Each procedure's legs must be in published sequence order.
+            for legs in self._proc_index.values():
+                legs.sort(key=lambda lg: lg.seqno)
+            self._proc_loaded = True
 
     def _index_proc_layer(
         self, proc_type: "ProcedureType", gdf: "pd.DataFrame"

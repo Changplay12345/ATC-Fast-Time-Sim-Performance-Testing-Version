@@ -21,6 +21,7 @@
  * app had before this module existed.
  */
 
+import { dataFetch } from "@/lib/backend";
 import type { Position } from "geojson";
 
 import { parseAltFt } from "@/lib/airspace";
@@ -35,7 +36,7 @@ let _cache: Promise<PdrActivityFile> | null = null;
  *  Mirrors `fetchAip` / `fetchAipRoutes` — one small file per AIRAC cycle. */
 export function fetchPdrActivity(): Promise<PdrActivityFile> {
   if (!_cache) {
-    _cache = fetch(ACTIVITY_URL, { cache: "no-store" }).then((res) => {
+    _cache = dataFetch(ACTIVITY_URL, { cache: "no-store" }).then((res) => {
       if (!res.ok) {
         throw new Error("Failed to load " + ACTIVITY_URL + ": " + res.status);
       }

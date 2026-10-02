@@ -56,3 +56,4 @@ release/
 
 # Generated from EULA.md by scripts/make_installer_license.py
 desktop/installer/EULA.txt
+desktop/installer/THIRD_PARTY_NOTICES.txt

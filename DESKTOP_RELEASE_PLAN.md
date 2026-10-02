@@ -602,34 +602,121 @@ the published 0.2.1. The check runs 3 s after launch and hourly.
   installed app can ever be updated again.
 - Every push to `main` also redeploys the hosted API (Render) and site (Vercel).
 
-## 15. Where work stopped (2026-10-02, end of session)
+### Second update, 0.2.1 -> 0.2.2 (2026-10-02, next morning)
 
-**State**
+The same test, run on the copy that had updated itself the night before:
+0.2.1 offered 0.2.2 with its notes; download 0 -> 97 % in 7 s; the old app
+exited; the new one was up 7 s later as 0.2.2 (app and engine), showing
+"What's new in 0.2.2" and "You are up to date". Two consecutive real updates
+is Phase 1's exit criterion.
 
-- `main` is at the replication-playbook commit; working tree clean.
-- Published: `v0.2.0`, `v0.2.1`. `v0.2.2` (update banner, hourly check) was
-  tagged and its CI release run was still building when the session ended.
-- This PC has **0.2.1 installed** (updated from 0.2.0 by the app itself).
-- Hosted: Vercel site and Render API (free plan, 2 workers) are live and on
-  the current `main`.
+### Installer licence page
 
-**Next, in order**
+Confirmed without clicking through an install: the generated NSIS script
+(`desktop/src-tauri/target/release/nsis/x64/installer.nsi`) defines `LICENSE`
+and inserts `MUI_PAGE_LICENSE`. Silent installs and updates skip the page.
 
-1. Confirm the `v0.2.2` run finished green and the release is published
-   (`gh run list --workflow desktop`, `gh release list`).
-2. Update the installed 0.2.1 to 0.2.2 from its About dialog — a second real
-   update, and it leaves this PC on a version that has the banner. From then
-   on a new release announces itself.
-3. Record that result in section 14.
-4. Remaining Phase 1 items: third-party licence notices; ship the 42 MB of
-   map data once instead of twice; look at the installer's licence page in an
-   interactive install.
-5. Then Phase 2 (data packs).
+## 15. Phase 1 close-out and the bridge to Phase 2 (0.2.3)
+
+| Item | What was done | Verified |
+|---|---|---|
+| Static data shipped once | The desktop front end no longer contains `data/`. Every data module uses `dataFetch` (`web/lib/backend.ts`): a plain fetch on the web, a request to the engine with the session token on desktop. The engine mounts its bundled `web/public/data` at `/data` in local mode, behind the token gate | Guard test scans the 8 data modules for a bare `fetch(`; token test covers `/data/`; in-window test below |
+| Third-party notices | `scripts/gen_notices.py` lists the engine's Python packages (from installed metadata), the front end's production packages (from `package-lock.json`) and the shell's crates (`cargo metadata`), plus notes for PyInstaller's bootloader, GDAL, PROJ, GEOS, WebView2, tiles and navdata | 24 Python, 157 JS, 477 Rust components |
+| Licences reachable in the app | EULA and notices are bundled as resources (`licenses/`); About has "Licence agreement" and "Third-party licences", which open them in the default viewer | Files present in the build output |
+
+This is also the first half of Phase 2: the front end now gets **all** static
+data from one place in the engine, so a data pack only has to change what
+that one folder is.
+
+### Two bugs found while testing 0.2.3 in the window
+
+**1. The first procedure lookup after launch answered 404.**
+
+- *Symptom.* In the app, `GET /api/procedures/VTSP/URGA1D?type=STAR&...`
+  returned 404 once, right after an import. The same request to a standalone
+  engine (frozen or from source, local mode or not) and to the hosted API
+  returned 200.
+- *Cause.* A race in `trajectory_sim/navdata.py::_load_procedures`. The
+  SID/STAR/approach index is built lazily on first use, and the "loaded" flag
+  was set **before** the index was built. The API answers on a thread pool;
+  the page asks for an airport's procedure list and a procedure's legs at the
+  same moment; the second request saw "loaded", searched a half-built index
+  (SIDs read, STARs not yet) and reported "not found". It is an old bug: the
+  hosted API has it too, but only for the first two requests after a cold
+  start, so nobody saw it. A desktop app cold-starts its engine at every
+  launch, which makes it visible every time.
+- *Fix.* Build the index under a `threading.Lock` with a second check inside
+  the lock, and set the flag only **after** indexing and sorting. A request
+  arriving meanwhile waits for the complete index.
+- *Test.* `tests/test_navdata_concurrency.py`: (a) a second lookup that
+  starts while the first is still reading sources, with the read slowed to
+  widen the window; (b) eight simultaneous first lookups. Against the old
+  code: 7 of 8 fail with "Procedure 'URGA1D' not found at 'VTSP'". With the
+  fix: all pass.
+
+**2. The app could stay running with no window.**
+
+- *Symptom.* After a test, asking the app to close from PowerShell
+  (`$process.CloseMainWindow()`) did nothing; a minute later the shell and 8
+  engine processes were still there. It had worked on every earlier run.
+- *Investigation.* Not reproducible at first (three clean closes in ~0.3 s:
+  plain, with WebView2 debugging, after an import with 8 engine processes).
+  The transcript showed the failing run differed in one thing: the window was
+  not in front. Listing the process's top-level windows showed two visible,
+  unowned ones: `Tauri Window` (the real one) and a 16x16
+  `Tao Thread Event Target` (the windowing library's internal message
+  window). .NET's `MainWindowHandle` is "the first such window in stacking
+  order", so with the app minimised it was the internal one.
+- *Cause, confirmed one variable at a time on fresh instances:*
+
+  | Close sent to | Result |
+  |---|---|
+  | the real window (what clicking X does) | clean exit in ~0.3 s |
+  | `taskkill /PID` without `/F` | clean exit |
+  | the internal window only | it is destroyed; the app keeps running |
+  | the internal window, then the real one | **windowless process that never exits, engine still running** |
+
+  Destroying the internal window breaks the event loop's ability to finish an
+  exit. Clicking X never does this, but any tool that picks a process's "main
+  window" by stacking order can.
+- *Fix, two parts.*
+  1. Shell (`exit_when_window_is_gone` in `desktop/src-tauri/src/lib.rs`,
+     Windows only): a thread outside the event loop polls the real window
+     (`IsWindow` and still owned by this process, because handle values are
+     reused). If it has been gone for 3 s and the process is still alive, it
+     stops the engine and exits. A normal exit takes ~0.3 s and never reaches
+     it.
+  2. Test tooling: never use `CloseMainWindow()` on a Tauri app. Find the
+     window by class (`Tauri Window`) and post `WM_CLOSE` to it.
+- *Test.* `desktop/smoke.ps1` now launches the app three times: a normal
+  close must end the app and the engine; a close that hits the internal
+  window first must still end both; a hard kill must take the engine with it.
+  The second check failed on the build without the guard (still running
+  after 15 s).
+
+**Verified on the rebuilt 0.2.3:** smoke test 11/11 (normal close 285 ms; the guard ended a windowless app in 3.6 s and logged it). In-window test on a cold engine, three launches: no failed requests (the 404 appeared in 3 of 3 launches before the fix), 30-31 data files served by the engine, 401 without the token, traversal 404, 54 airport markers, 520 flights imported and generated. Python: `tests` 31 passed, `trajectory_sim/tests` 278 passed; front end 957 passed; type check clean.
+
+## 16. Where work stands
+
+**Remaining before calling Phase 1 closed:** none blocking. Optional: an
+interactive look at the installer's licence page; the smoke test on a
+Windows 10 machine (CI's runner is Windows Server 2022/2025).
+
+**Phase 2 (data packs), next:** pack format and manifest; the engine reads
+its data from an active-pack folder in the user data directory (falling back
+to the bundled one); the shell checks a signed data manifest, downloads,
+verifies and swaps; `data_version` in `/api/health` and the About dialog.
 
 **Loose ends**
 
 - `.github/workflows/keepalive.yml` pings `trajectory-api-zf51.onrender.com`,
-  an older Render service, not the one deployed this week. Decide which
-  should be kept awake.
+  an older Render service, not the one deployed this week.
 - The hosted API still cannot hold a 2,000-flight import in 512 MB.
 - Back up `%USERPROFILE%\.tauri\atc-fts-updater.key`.
+- `trajectory_sim/tests/test_constraints.py::test_descent_floor_does_not_pin_climb_start`
+  fails when `tests/` and `trajectory_sim/tests/` run in one pytest process
+  (a threshold altitude of 1036 ft where the test expects under 1000), and
+  passes when either folder runs alone. It fails the same way on the commit
+  before this work, so it is a test-isolation problem, not a regression; CI
+  runs `tests/` only. Four more engine test files need `httpx`, which is not
+  in `requirements.txt`.

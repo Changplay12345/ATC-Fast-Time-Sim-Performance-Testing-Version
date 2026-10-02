@@ -23,6 +23,7 @@
  * Pure and DOM-free; the data comes from `scripts/ingest_aixm_route_segments.py`.
  */
 
+import { dataFetch } from "@/lib/backend";
 import { routeTokens } from "./routeRules";
 
 export type SegmentDirection = "BOTH" | "FORWARD" | "BACKWARD";
@@ -54,7 +55,7 @@ let _cache: Promise<RouteSegmentFile> | null = null;
 /** Fetch + memoise the segment table for the page's lifetime. */
 export function fetchRouteSegments(): Promise<RouteSegmentFile> {
   if (!_cache) {
-    _cache = fetch(SEGMENTS_URL, { cache: "no-store" }).then((res) => {
+    _cache = dataFetch(SEGMENTS_URL, { cache: "no-store" }).then((res) => {
       if (!res.ok) {
         throw new Error("Failed to load " + SEGMENTS_URL + ": " + res.status);
       }

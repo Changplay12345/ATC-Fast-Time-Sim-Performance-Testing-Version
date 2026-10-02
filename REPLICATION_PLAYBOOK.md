@@ -232,13 +232,57 @@ the engine's at start-up.
    held back while a replay runs. Check a few seconds after launch and
    hourly.
 
+### C.5b Ship static data once, and the licences
+
+- **Data.** A static export copies `public/data` into the front end, and the
+  engine bundles the same folder: ~40 MB twice. Give the front end one
+  `dataFetch(url)` helper — plain `fetch` on the web; on desktop a request to
+  the engine (with the token) for any `/data/…` path — mount the folder in
+  the engine in local mode behind the token gate, and delete `data/` from
+  the export before bundling. Guard it with a test that scans the data
+  modules for a bare `fetch(`. This also gives data packs a single place to
+  swap.
+- **Third-party notices.** Generate them from the real dependency data, not
+  by hand: Python from installed distribution metadata (walk the
+  requirements' closure, skipping `extra ==` requirements), JavaScript from
+  `package-lock.json` (non-dev entries carry a `license` field), Rust from
+  `cargo metadata`. Add the notes no tool produces: PyInstaller's bootloader
+  exception, GDAL/PROJ/GEOS, the WebView runtime, map tiles, navdata.
+- **In the app.** Bundle the EULA and the notices as resources and open them
+  from About with the system viewer (`.txt`, so Notepad opens it).
+- **In the installer.** `bundle.licenseFile` with a plain-text EULA
+  generated from the Markdown one; check the generated `installer.nsi` for
+  `MUI_PAGE_LICENSE` rather than clicking through an install.
+
+### C.5c Two things a desktop engine exposes that a server hides
+
+- **Every launch is a cold start, so first-request races show up every
+  time.** Before shipping, look for lazily built shared state in the engine
+  (`if not loaded: loaded = True; build()`) and make each one build under a
+  lock and publish only when complete. Here it was the procedure index in
+  `navdata.py`; the symptom was one 404 on the first STAR lookup. Test with
+  several threads making the *first* call together, and with the build
+  slowed down. Run the in-window test with the response listener on from the
+  first page load: this bug only showed there, never against a warm engine.
+- **Guard against a windowless process.** Give the shell a watcher that is
+  independent of the event loop: if the main window no longer exists and the
+  process is still alive a few seconds later, stop the engine and exit
+  (`exit_when_window_is_gone`). Check the handle still belongs to this
+  process; handle values are reused.
+
 ### C.6 Build, smoke test, CI
 
 - `desktop/build.ps1`: version check → licence text → freeze engine → static
   export → `tauri build` (signed updater artifacts) → release folder.
-- `desktop/smoke.ps1`: start the app; engine started, loopback only, health,
-  version match, local mode, 401 without token, docs off, engine dies when
-  the app is killed. `-Install` runs the installer first.
+- `desktop/smoke.ps1`: three launches. (1) engine started, loopback only,
+  health, version match, local mode, 401 without token, docs off, the window
+  opens, closing it ends the app and the engine; (2) the app still ends when
+  its internal helper window is closed first; (3) the engine dies when the
+  app is killed. `-Install` runs the installer first.
+- **Closing a Tauri app from a script:** never `CloseMainWindow()`. The
+  process has two top-level windows (`Tauri Window` and the invisible
+  `Tao Thread Event Target`) and .NET picks by stacking order. Find the
+  window by class and post `WM_CLOSE` (see `SmokeWin` in `smoke.ps1`).
 - `.github/workflows/desktop.yml`: tests on every push (Linux); on a `v*`
   tag: build on Windows → smoke test on the clean runner → publish.
 - Keep `.ps1` files **ASCII-only** (Windows PowerShell 5.1 reads BOM-less
@@ -322,6 +366,14 @@ looked at (a screenshot), not inferred.
    licensing). They change file layouts and are cheap to ask first.
 8. **Start with the single version source and the smoke script.** Both were
    added mid-way and would have caught problems earlier.
+9. **When something fails once and then will not reproduce, go back to the
+   record of the failing run and list what was different**, before changing
+   any code. The app-would-not-close bug took three clean reproductions that
+   proved nothing; the one difference (the window was not in front) led
+   straight to the cause. Then confirm with one variable per run.
+10. **Do not discard a return value or a handle in a test command.** The
+    failing close was `[void]$app.CloseMainWindow()`; printing the handle and
+    its title would have shown the wrong window immediately.
 
 ---
 
@@ -332,6 +384,7 @@ looked at (a screenshot), not inferred.
 | `desktop/sidecar/engine_main.py`, `engine.spec` | Frozen engine entry point and PyInstaller recipe |
 | `desktop/src-tauri/src/lib.rs`, `tauri.conf.json`, `Cargo.toml` | Shell: engine lifecycle, config injection, updater, commands |
 | `desktop/build.ps1`, `desktop/smoke.ps1` | Build and smoke test |
+| `tests/test_navdata_concurrency.py` | The cold-start race test for lazily built engine state |
 | `desktop/brand.json`, `desktop/icons/` | Product identity in one place |
 | `web/lib/backend.ts` (+ test) | Runtime engine address and token; the `apiFetch` guard test |
 | `web/lib/desktop.ts`, `web/components/desktop/*` | Shell bridge, update hook, About dialog, update banner |

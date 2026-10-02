@@ -245,6 +245,58 @@ fn stop_engine(app: &tauri::AppHandle) {
     }
 }
 
+/// Windows: never linger without a window.
+///
+/// Closing the window ends the app. But the windowing library also keeps an
+/// invisible helper window ("Tao Thread Event Target"), and a close sent to
+/// *that* one destroys it — PowerShell's `CloseMainWindow()` does this when
+/// the app is minimised, and so can any tool that picks a process's "main"
+/// window by stacking order. After that the event loop can no longer finish
+/// an exit: closing the real window leaves a windowless process, and the
+/// engine it owns, running until someone kills it.
+///
+/// So the real window is watched from outside the event loop, and if it is
+/// gone and the process is still here a few seconds later, the engine is
+/// stopped and the process ends itself. A normal exit takes well under a
+/// second and never gets this far.
+#[cfg(windows)]
+fn exit_when_window_is_gone(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
+    #[link(name = "user32")]
+    extern "system" {
+        fn IsWindow(hwnd: isize) -> i32;
+        fn GetWindowThreadProcessId(hwnd: isize, pid: *mut u32) -> u32;
+    }
+    const GRACE: Duration = Duration::from_secs(3);
+
+    let Ok(hwnd) = window.hwnd() else {
+        log::warn!("no window handle; the window watch is off");
+        return;
+    };
+    let hwnd = hwnd.0 as isize;
+    // A handle value can be reused once its window is destroyed, so "is a
+    // window" is not enough: it must still be this process's window.
+    let ours = move || {
+        let mut pid = 0u32;
+        unsafe { IsWindow(hwnd) != 0 && GetWindowThreadProcessId(hwnd, &mut pid) != 0 && pid == std::process::id() }
+    };
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let mut gone_since: Option<Instant> = None;
+        loop {
+            std::thread::sleep(Duration::from_millis(500));
+            if ours() {
+                gone_since = None;
+                continue;
+            }
+            if gone_since.get_or_insert_with(Instant::now).elapsed() >= GRACE {
+                log::warn!("the window is gone but the app did not exit; stopping the engine and exiting");
+                stop_engine(&app);
+                std::process::exit(0);
+            }
+        }
+    });
+}
+
 /// A blocking native error box. Shown from its own thread: a message box must
 /// not block the event-loop thread the setup hook runs on.
 fn fatal(app: &tauri::AppHandle, message: String) {
@@ -317,6 +369,37 @@ fn open_logs_folder(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn open_exports_folder(app: tauri::AppHandle) -> Result<(), String> {
     reveal(&dirs(&app)?.2)
+}
+
+/// Open one of the licence texts bundled with the app in the default viewer.
+#[tauri::command]
+fn open_licence(app: tauri::AppHandle, which: String) -> Result<(), String> {
+    let name = match which.as_str() {
+        "eula" => "EULA.txt",
+        "third-party" => "THIRD_PARTY_NOTICES.txt",
+        _ => return Err("unknown document".into()),
+    };
+    let path = app
+        .path()
+        .resource_dir()
+        .map_err(|e| e.to_string())?
+        .join("licenses")
+        .join(name);
+    if !path.is_file() {
+        return Err(format!("{} is missing from the installation", name));
+    }
+    let program = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    Command::new(program)
+        .arg(&path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("cannot open {}: {e}", path.display()))
 }
 
 #[derive(serde::Serialize)]
@@ -409,6 +492,7 @@ pub fn run() {
             app_info,
             open_logs_folder,
             open_exports_folder,
+            open_licence,
             check_update,
             install_update
         ])
@@ -442,7 +526,8 @@ pub fn run() {
 
             // Created only now, and with the config injected before any page
             // script runs, so the page's very first request finds the engine.
-            tauri::WebviewWindowBuilder::new(
+            #[allow(unused_variables)]
+            let window = tauri::WebviewWindowBuilder::new(
                 app,
                 "main",
                 tauri::WebviewUrl::App("index.html".into()),
@@ -454,6 +539,8 @@ pub fn run() {
                 "Object.defineProperty(window, '__APP_CONFIG__', {{ value: Object.freeze({config}), writable: false }});"
             ))
             .build()?;
+            #[cfg(windows)]
+            exit_when_window_is_gone(&handle, &window);
             Ok(())
         })
         .build(tauri::generate_context!())

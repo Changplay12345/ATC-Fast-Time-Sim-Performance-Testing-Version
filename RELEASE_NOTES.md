@@ -1,4 +1,7 @@
-Version 0.2.2
+Version 0.2.3
 
-- New: an update notice appears in the top-right corner on any screen when a new version is available, with Install and restart, What's new, and Later.
-- Updates are now checked a few seconds after launch and every hour while the app is open.
+- Smaller download: the app no longer ships its map and navigation data twice.
+- About now opens the licence agreement and the list of third-party licences.
+- The engine serves the app's data files itself, behind the same session protection as the rest.
+- Fixed: the first procedure lookup after starting the app could fail with "not found".
+- Fixed: the app can no longer stay running in the background without a window.

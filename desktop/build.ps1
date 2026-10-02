@@ -40,6 +40,10 @@ Step "installer licence text" {
   & $python (Join-Path $repo "scripts\make_installer_license.py")
 }
 
+Step "third-party notices" {
+  & $python (Join-Path $repo "scripts\gen_notices.py")
+}
+
 if (-not $SkipEngine) {
   Step "engine (PyInstaller)" {
     Push-Location $repo
@@ -64,6 +68,10 @@ if (-not $SkipWeb) {
       # Shown in the About dialog as "What's new in this version".
       $env:NEXT_PUBLIC_RELEASE_NOTES = (Get-Content (Join-Path $repo "RELEASE_NOTES.md") -Raw).Trim()
       npx next build
+      # The desktop front end gets its static data from the engine (which
+      # bundles the same folder), so it does not ship a second copy.
+      $exportData = Join-Path $repo "web\.next-desktop\data"
+      if (Test-Path $exportData) { Remove-Item -Recurse -Force $exportData }
     } finally {
       Remove-Item Env:DESKTOP_BUILD, Env:NEXT_DIST_DIR, Env:NEXT_PUBLIC_API_BASE, Env:NEXT_PUBLIC_APP_VERSION, Env:NEXT_PUBLIC_RELEASE_NOTES -ErrorAction SilentlyContinue
       Pop-Location

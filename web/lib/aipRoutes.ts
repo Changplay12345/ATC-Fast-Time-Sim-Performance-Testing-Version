@@ -12,6 +12,7 @@
  * Non-RNAV capability.
  */
 
+import { dataFetch } from "@/lib/backend";
 import type { Fix } from "./aip";
 import type { RouteOption } from "./routeFinder";
 import { resolveRoutePreview } from "./routePreview";
@@ -40,7 +41,7 @@ let _cache: Promise<AipRoute[]> | null = null;
 /** Fetch + memoise the predefined-route table for the page's lifetime. */
 export function fetchAipRoutes(): Promise<AipRoute[]> {
   if (!_cache) {
-    _cache = fetch(AIP_ROUTES_URL, { cache: "no-store" })
+    _cache = dataFetch(AIP_ROUTES_URL, { cache: "no-store" })
       .then((res) => {
         if (!res.ok) {
           throw new Error(`Failed to load ${AIP_ROUTES_URL}: ${res.status}`);

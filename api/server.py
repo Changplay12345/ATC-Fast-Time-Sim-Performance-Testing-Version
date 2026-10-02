@@ -174,7 +174,8 @@ class _SessionTokenMiddleware:
             return await self.inner(scope, receive, send)
         path = scope.get("path", "")
         method = scope.get("method", "GET")
-        if method == "OPTIONS" or path == "/api/health" or not path.startswith("/api/"):
+        guarded = path.startswith("/api/") or path.startswith("/data/")
+        if method == "OPTIONS" or path == "/api/health" or not guarded:
             return await self.inner(scope, receive, send)
         supplied = ""
         for name, value in scope.get("headers", []):
@@ -235,6 +236,16 @@ else:
 # it keeps nearly all of the size win for a third of the CPU, and CPU is what a
 # small host has least of. Bodies under 1 KB aren't worth the header overhead.
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
+
+# Local mode: the engine also serves the static data folder (navdata,
+# airspace, procedures) that the web build gets from its own site. The desktop
+# front end then carries no second copy of those ~40 MB, and there is one
+# place the data comes from - which is what a data pack will replace. Behind
+# the session token like everything else.
+if _LOCAL_MODE:
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/data", StaticFiles(directory=str(_DATA)), name="data")
 
 
 class GenerateRequest(BaseModel):

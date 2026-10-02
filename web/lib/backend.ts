@@ -80,3 +80,22 @@ export function withToken(url: string, token: string | undefined = BACKEND.token
   if (!token) return url;
   return `${url}${url.includes("?") ? "&" : "?"}t=${encodeURIComponent(token)}`;
 }
+
+/**
+ * `fetch` for the app's static data files (`/data/…`: navdata, airspace,
+ * procedures).
+ *
+ * On the web they are files of the site. The desktop app does not carry a
+ * second copy inside its front end: the engine serves the one it already
+ * has — and, later, whichever data pack is active — so there the request
+ * goes to the engine, with the session token. Anything that is not a
+ * `/data/` path is fetched as usual.
+ */
+export function dataUrl(url: string, backend: AppConfig = BACKEND): string {
+  return backend.mode === "local" && url.startsWith("/data/") ? `${backend.apiBase}${url}` : url;
+}
+
+export function dataFetch(url: string, init?: RequestInit): Promise<Response> {
+  const target = dataUrl(url);
+  return target === url ? fetch(url, init) : apiFetch(target, init);
+}

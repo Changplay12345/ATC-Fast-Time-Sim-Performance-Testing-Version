@@ -21,6 +21,8 @@
  *     a handful of movements can be shown as the thin evidence it is.
  */
 
+import { dataFetch } from "@/lib/backend";
+
 /** Which half of the operation a default is wanted for. */
 export type RunwayDirection = "DEP" | "ARR";
 
@@ -82,7 +84,7 @@ function parse(text: string): DefaultIndex {
 /** Load + memoise the whole table (~170 kB, fetched once per session). */
 function loadIndex(): Promise<DefaultIndex> {
   if (!_index) {
-    _index = fetch("/data/airports/runway_default.csv")
+    _index = dataFetch("/data/airports/runway_default.csv")
       .then((r) => {
         if (!r.ok) throw new Error(`runway_default.csv: HTTP ${r.status}`);
         return r.text();

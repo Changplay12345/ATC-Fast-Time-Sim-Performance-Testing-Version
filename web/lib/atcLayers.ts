@@ -10,6 +10,7 @@
  * `ProcedureLineCollection` / `ProcedureWaypointCollection`.
  */
 
+import { dataFetch } from "@/lib/backend";
 import type {
   FeatureCollection,
   MultiPoint,
@@ -28,7 +29,7 @@ import type {
 // cache but revalidates first (a cheap 304 when the file is unchanged), so an
 // edit shows up on the next load while unchanged files stay fast.
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(encodeURI(url), { cache: "no-cache" });
+  const res = await dataFetch(encodeURI(url), { cache: "no-cache" });
   if (!res.ok) {
     throw new Error(`Failed to load ${url}: ${res.status} ${res.statusText}`);
   }
@@ -36,7 +37,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 async function fetchText(url: string): Promise<string> {
-  const res = await fetch(encodeURI(url), { cache: "no-cache" });
+  const res = await dataFetch(encodeURI(url), { cache: "no-cache" });
   if (!res.ok) {
     throw new Error(`Failed to load ${url}: ${res.status} ${res.statusText}`);
   }

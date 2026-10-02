@@ -14,6 +14,8 @@
  *   }
  */
 
+import { dataFetch } from "@/lib/backend";
+
 const AIP_URL = "/data/aip_VT.json";
 
 export interface AipAirport {
@@ -48,7 +50,7 @@ let _cache: Promise<AipData> | null = null;
 /** Fetch + memoise the AIP cache for the page's lifetime. */
 export function fetchAip(): Promise<AipData> {
   if (!_cache) {
-    _cache = fetch(AIP_URL, { cache: "no-store" }).then((res) => {
+    _cache = dataFetch(AIP_URL, { cache: "no-store" }).then((res) => {
       if (!res.ok) throw new Error(`Failed to load ${AIP_URL}: ${res.status}`);
       return res.json() as Promise<AipData>;
     });

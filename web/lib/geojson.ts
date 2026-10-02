@@ -8,6 +8,7 @@
  * de-duplicate by identifier. No coordinate is invented or guessed.
  */
 
+import { dataFetch } from "@/lib/backend";
 import { fetchRunways } from "./atcLayers";
 import type {
   AirwayCollection,
@@ -33,7 +34,7 @@ const ILS_WPTS_URL = "/data/aixm/ils_wp.geojson";
 // geojson is edited in place when a procedure is corrected, so a hard-cached
 // copy would keep the picker/preview on the old data. See atcLayers.fetchJson.
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-cache" });
+  const res = await dataFetch(url, { cache: "no-cache" });
   if (!res.ok) {
     throw new Error(`Failed to load ${url}: ${res.status} ${res.statusText}`);
   }
@@ -426,7 +427,7 @@ export async function staticProcedureWaypoints(
  * polylines (the coded legs + constraints come from the procedures API).
  */
 export async function fetchSidLines(): Promise<ProcedureLineCollection> {
-  const res = await fetch(SID_LINES_URL, { cache: "no-cache" });
+  const res = await dataFetch(SID_LINES_URL, { cache: "no-cache" });
   if (!res.ok) {
     throw new Error(
       `Failed to load ${SID_LINES_URL}: ${res.status} ${res.statusText}`,
@@ -437,7 +438,7 @@ export async function fetchSidLines(): Promise<ProcedureLineCollection> {
 
 /** Fetch the drawn STAR (arrival) procedure tracks. Loaded lazily. */
 export async function fetchStarLines(): Promise<ProcedureLineCollection> {
-  const res = await fetch(STAR_LINES_URL, { cache: "no-cache" });
+  const res = await dataFetch(STAR_LINES_URL, { cache: "no-cache" });
   if (!res.ok) {
     throw new Error(
       `Failed to load ${STAR_LINES_URL}: ${res.status} ${res.statusText}`,
@@ -452,7 +453,7 @@ export async function fetchStarLines(): Promise<ProcedureLineCollection> {
  * on initial page load.
  */
 export async function fetchFir(): Promise<FirCollection> {
-  const res = await fetch(FIR_URL, { cache: "no-cache" });
+  const res = await dataFetch(FIR_URL, { cache: "no-cache" });
   if (!res.ok) {
     throw new Error(
       `Failed to load ${FIR_URL}: ${res.status} ${res.statusText}`,
@@ -495,7 +496,7 @@ export async function fetchSector(key: SectorKey): Promise<SectorCollection> {
   // altitude-aware, so these corrected upper/lower bands are what decides which
   // volume actually contains the aircraft.
   const url = `/data/sectors_corrected/${_SECTOR_FILE[key]}.geojson`;
-  const res = await fetch(url, { cache: "no-cache" });
+  const res = await dataFetch(url, { cache: "no-cache" });
   if (!res.ok) {
     throw new Error(`Failed to load ${url}: ${res.status} ${res.statusText}`);
   }
@@ -518,7 +519,7 @@ export function fetchAirwayReporting(): Promise<AirwayPointCollection> {
 
 /** Fetch the raw airway-segment FeatureCollection from the source file. */
 export async function fetchAirways(): Promise<AirwayCollection> {
-  const res = await fetch(SOURCE_URL, { cache: "no-store" });
+  const res = await dataFetch(SOURCE_URL, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(
       `Failed to load ${SOURCE_URL}: ${res.status} ${res.statusText}`,

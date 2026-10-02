@@ -109,3 +109,12 @@ def test_unauthorized_response_still_has_cors_headers(token):
     scope_headers = {"Origin": "http://localhost:3000"}
     status, _ = call("GET", "/api/cat62_reference", scope_headers)
     assert status == 401
+
+
+def test_static_data_is_behind_the_token_too(token):
+    # Served only in local mode, but the gate must cover the path regardless:
+    # the data may be licensed.
+    status, body = call("GET", "/data/aip_VT.json")
+    assert status == 401
+    assert body == {"detail": "Unauthorized"}
+

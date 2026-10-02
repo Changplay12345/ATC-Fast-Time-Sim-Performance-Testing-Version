@@ -16,6 +16,7 @@ import { API_BASE, BACKEND, apiFetch } from "@/lib/backend";
 import {
   appInfo,
   openExportsFolder,
+  openLicence,
   openLogsFolder,
   type AppInfo,
   type DesktopUpdate,
@@ -183,6 +184,18 @@ export default function AboutDialog({ onClose, update, busy }: Props) {
             </button>
             <button type="button" className="about-btn" onClick={() => void openExportsFolder()}>
               Open exports folder
+            </button>
+          </div>
+          <div className="about-support">
+            <button type="button" className="about-btn" onClick={() => void openLicence("eula")}>
+              Licence agreement
+            </button>
+            <button
+              type="button"
+              className="about-btn"
+              onClick={() => void openLicence("third-party")}
+            >
+              Third-party licences
             </button>
           </div>
           <p className="about-foot">

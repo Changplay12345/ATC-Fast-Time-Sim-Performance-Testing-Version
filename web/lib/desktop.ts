@@ -48,6 +48,9 @@ export interface UpdateCheck {
 export const appInfo = () => tauri().core.invoke<AppInfo>("app_info");
 export const openLogsFolder = () => tauri().core.invoke<void>("open_logs_folder");
 export const openExportsFolder = () => tauri().core.invoke<void>("open_exports_folder");
+/** Opens a licence text bundled with the app in the default viewer. */
+export const openLicence = (which: "eula" | "third-party") =>
+  tauri().core.invoke<void>("open_licence", { which });
 export const checkUpdate = () => tauri().core.invoke<UpdateCheck>("check_update");
 /** Downloads and installs; on Windows the app closes itself when it finishes. */
 export const installUpdate = () => tauri().core.invoke<void>("install_update");
