@@ -39,6 +39,11 @@ export interface AppInfo {
 
 export interface UpdateCheck {
   available: boolean;
+  /** This version is below the release's minimum and must update to go on. */
+  required?: boolean;
+  /** A newer release exists, but its staged rollout has not reached this
+   *  installation and nobody asked for it. */
+  heldBack?: boolean;
   /** The version on offer, when there is one. */
   version?: string;
   notes?: string;
@@ -51,7 +56,12 @@ export const openExportsFolder = () => tauri().core.invoke<void>("open_exports_f
 /** Opens a licence text bundled with the app in the default viewer. */
 export const openLicence = (which: "eula" | "third-party") =>
   tauri().core.invoke<void>("open_licence", { which });
-export const checkUpdate = () => tauri().core.invoke<UpdateCheck>("check_update");
+/** `manual`: the user asked (About > Check for updates). A staged rollout
+ *  holds a release back from the background check only. */
+export const checkUpdate = (manual = false) =>
+  tauri().core.invoke<UpdateCheck>("check_update", { manual });
+/** Zips logs and versions into the exports folder; resolves to the file name. */
+export const exportDiagnostics = () => tauri().core.invoke<string>("export_diagnostics");
 /** Downloads and installs; on Windows the app closes itself when it finishes. */
 export const installUpdate = () => tauri().core.invoke<void>("install_update");
 
@@ -65,6 +75,8 @@ export type UpdateStatus =
 
 export interface DesktopUpdate {
   status: UpdateStatus;
+  /** The offered version is mandatory: this one may not be used any more. */
+  required: boolean;
   version?: string;
   notes?: string;
   /** 0–1 while downloading; null when the size is unknown. */
@@ -72,7 +84,8 @@ export interface DesktopUpdate {
   error?: string;
   /** When the last check finished. */
   checkedAt: number | null;
-  check: () => Promise<void>;
+  /** `manual` = the user pressed the button (see `checkUpdate`). */
+  check: (manual?: boolean) => Promise<void>;
   install: () => Promise<void>;
 }
 
@@ -90,19 +103,26 @@ const RECHECK_MS = 60 * 60 * 1000;
 export function useDesktopUpdate(enabled: boolean): DesktopUpdate {
   const [state, setState] = useState<Omit<DesktopUpdate, "check" | "install">>({
     status: "idle",
+    required: false,
     progress: null,
     checkedAt: null,
   });
   const busy = useRef(false);
+  // Once the user has asked for an update by hand, later background checks
+  // ask the same way: an update they were shown must not vanish an hour later
+  // because the rollout has not reached them.
+  const askedByHand = useRef(false);
 
-  const check = useCallback(async () => {
+  const check = useCallback(async (manual = false) => {
     if (!enabled || busy.current) return;
     busy.current = true;
+    if (manual) askedByHand.current = true;
     setState((s) => ({ ...s, status: "checking", error: undefined }));
     try {
-      const r = await checkUpdate();
+      const r = await checkUpdate(manual || askedByHand.current);
       setState({
         status: r.available ? "available" : "none",
+        required: !!r.required,
         version: r.version,
         notes: r.notes,
         progress: null,
@@ -150,8 +170,8 @@ export function useDesktopUpdate(enabled: boolean): DesktopUpdate {
 
   useEffect(() => {
     if (!enabled) return;
-    const first = window.setTimeout(check, FIRST_CHECK_MS);
-    const every = window.setInterval(check, RECHECK_MS);
+    const first = window.setTimeout(() => void check(), FIRST_CHECK_MS);
+    const every = window.setInterval(() => void check(), RECHECK_MS);
     return () => {
       window.clearTimeout(first);
       window.clearInterval(every);

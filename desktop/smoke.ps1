@@ -13,6 +13,7 @@
     5. the window opens, and closing it ends the app and the engine
     6. the app still ends if its internal helper window was closed first
     7. killing the app takes the engine with it (the parent watch)
+    8. the app notices when its engine dies under it
   Exits non-zero if any check failed.
 
   Closing the window: do NOT use .NET's CloseMainWindow() for this. The
@@ -118,11 +119,14 @@ Stop-All
 # expected (the helper-window case below). More means a normal close did not
 # finish on its own on this machine - not a failure, but worth knowing.
 $shellLog = Join-Path $env:LOCALAPPDATA "th.co.bearcat.atcfts\logs\ATC Fast-Time Simulation Tool.log"
-function Watcher-Count {
+# How many times the shell has logged $text so far.
+function Log-Count($text) {
   if (-not (Test-Path $shellLog)) { return 0 }
-  @(Select-String -Path $shellLog -SimpleMatch "the window is gone but the app did not exit").Count
+  @(Select-String -Path $shellLog -SimpleMatch $text).Count
 }
-$watcherBefore = Watcher-Count
+$WATCHER_LINE = "the window is gone but the app did not exit"
+$ENGINE_DOWN_LINE = "the engine stopped unexpectedly"
+$watcherBefore = Log-Count $WATCHER_LINE
 
 # --- first launch: the engine, then a normal close -------------------------
 Write-Host "starting $Exe"
@@ -151,7 +155,7 @@ if ($window -ne [IntPtr]::Zero) {
   $sw = [Diagnostics.Stopwatch]::StartNew()
   [void][SmokeWin]::Close($window)
   $ok = Wait-Gone $app 10
-  $byWatcher = (Watcher-Count) - $watcherBefore
+  $byWatcher = (Log-Count $WATCHER_LINE) - $watcherBefore
   Check "closing the window ends the app and the engine" $ok "($($sw.ElapsedMilliseconds) ms$(if ($byWatcher) { ', finished by the window watcher' }))"
 }
 Stop-All
@@ -184,6 +188,20 @@ foreach ($i in 1..40) {
   if (-not (Get-Process atc-engine -ErrorAction SilentlyContinue)) { $gone = $true; break }
 }
 Check "engine exits when the app is killed" $gone
+Stop-All
+
+# --- fourth launch: the engine dies under the app --------------------------
+# The shell must notice (it then tells the user and offers a restart; that
+# dialog is on screen when this launch is stopped).
+$run = Start-App
+$downBefore = Log-Count $ENGINE_DOWN_LINE
+Stop-Process -Id $run.Engine.ProcessId -Force
+$noticed = $false
+foreach ($i in 1..40) {
+  Start-Sleep -Milliseconds 250
+  if ((Log-Count $ENGINE_DOWN_LINE) -gt $downBefore) { $noticed = $true; break }
+}
+Check "the app notices when its engine dies" $noticed
 Stop-All
 
 if ($failed) { Write-Host "`n$failed check(s) failed" -ForegroundColor Red; exit 1 }

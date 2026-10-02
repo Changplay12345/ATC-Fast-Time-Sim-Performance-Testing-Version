@@ -12674,6 +12674,12 @@ select.fp-input {
    Top-right, as a compact card: clear of the opening card (centred) and of
    the main view's controls (bars along the top, toasts bottom-right, legend
    bottom-left). */
+/* A required update replaces the app: above every other modal, and opaque
+   enough that what is behind it is plainly out of reach. */
+.required-update {
+  z-index: 5000;
+  background: rgba(2, 6, 23, 0.88);
+}
 .update-banner {
   position: fixed;
   top: 96px;

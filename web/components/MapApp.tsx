@@ -163,6 +163,7 @@ import { usePlanScan } from "@/lib/cdr/usePlanScan";
 import AboutDialog from "@/components/desktop/AboutDialog";
 import UpdateBanner from "@/components/desktop/UpdateBanner";
 import DataBanner from "@/components/desktop/DataBanner";
+import RequiredUpdate from "@/components/desktop/RequiredUpdate";
 import { IS_DESKTOP } from "@/lib/backend";
 import { useDesktopData, useDesktopUpdate } from "@/lib/desktop";
 import { makeSepMinNmAt } from "@/lib/cdr/sepMinAt";
@@ -4250,6 +4251,7 @@ export default function MapApp() {
       {IS_DESKTOP && !aboutOpen && (
         <UpdateBanner update={desktopUpdate} busy={sim.playing} onDetails={openAbout} />
       )}
+      {IS_DESKTOP && <RequiredUpdate update={desktopUpdate} />}
       {/* Same corner as the update notice, so it waits its turn: an app update
           restarts the app anyway, and that restart picks the new data up. */}
       {IS_DESKTOP &&

@@ -1,5 +1,6 @@
-Version 0.3.0
+Version 0.4.0
 
-- New: navigation data now updates by itself. When a new data cycle is published the app downloads it in the background, checks it, and uses it the next time the app starts — no new installer needed.
-- A notice appears when new data is ready, with Restart now or Later.
-- About shows which navigation data is loaded and can check for new data on request.
+- New: About > Export diagnostics saves the app's logs and version details as one file to send to support. Nothing is sent automatically, and it holds none of your flight data.
+- If the simulation engine ever stops unexpectedly, the app now says so and offers to restart, instead of failing silently.
+- Updates can now be released gradually, and a critical fix can be made mandatory.
+- Logs no longer grow without limit, and the previous session's engine log is kept.

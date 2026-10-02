@@ -39,7 +39,8 @@ export default function UpdateBanner({ update, busy, onDetails }: Props) {
     update.status === "available" ||
     update.status === "downloading" ||
     (update.status === "error" && !!update.version);
-  if (!offered || !update.version) return null;
+  // A required update has its own screen (RequiredUpdate), not a banner.
+  if (!offered || !update.version || update.required) return null;
   if (update.status === "available" && dismissed === update.version) return null;
 
   const later = () => {

@@ -15,6 +15,7 @@ import NavIcon from "@/components/nav/NavIcon";
 import { API_BASE, BACKEND, apiFetch } from "@/lib/backend";
 import {
   appInfo,
+  exportDiagnostics,
   openExportsFolder,
   openLicence,
   openLogsFolder,
@@ -80,6 +81,16 @@ function dataLine(d: DesktopData): string {
 export default function AboutDialog({ onClose, update, data, busy }: Props) {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [engine, setEngine] = useState<EngineHealth | null>(null);
+  // "busy" | the exported file's name | an error message
+  const [diag, setDiag] = useState<{ state: "busy" | "done" | "error"; text?: string } | null>(
+    null,
+  );
+  const runDiagnostics = () => {
+    setDiag({ state: "busy" });
+    exportDiagnostics()
+      .then((name) => setDiag({ state: "done", text: name }))
+      .catch((e) => setDiag({ state: "error", text: e instanceof Error ? e.message : String(e) }));
+  };
 
   useEffect(() => {
     appInfo().then(setInfo).catch(() => setInfo(null));
@@ -170,7 +181,7 @@ export default function AboutDialog({ onClose, update, data, busy }: Props) {
                 <button
                   type="button"
                   className="about-btn"
-                  onClick={() => void update.check()}
+                  onClick={() => void update.check(true)}
                   disabled={working}
                 >
                   Check for updates
@@ -236,7 +247,23 @@ export default function AboutDialog({ onClose, update, data, busy }: Props) {
             <button type="button" className="about-btn" onClick={() => void openExportsFolder()}>
               Open exports folder
             </button>
+            <button
+              type="button"
+              className="about-btn"
+              onClick={runDiagnostics}
+              disabled={diag?.state === "busy"}
+              title="Save the app's logs and version details as one file to send to support. Nothing is sent automatically."
+            >
+              Export diagnostics
+            </button>
           </div>
+          {diag && diag.state !== "busy" && (
+            <p className="about-hint" role="status">
+              {diag.state === "done"
+                ? `Saved ${diag.text} in the exports folder. Attach it to an email to support — it holds logs and versions, none of your flight data.`
+                : `Could not export diagnostics: ${diag.text}`}
+            </p>
+          )}
           <div className="about-support">
             <button type="button" className="about-btn" onClick={() => void openLicence("eula")}>
               Licence agreement

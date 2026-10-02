@@ -10,7 +10,13 @@ writes, into ``release/``:
                                     the manifest must point at the exact URL)
   latest.json                       what the app's updater fetches:
                                     version, notes, date, and per platform the
-                                    download URL and its signature
+                                    download URL and its signature; plus the
+                                    release policy from desktop/release.json:
+                                    "rollout" (the share of installations
+                                    offered it, 0-100) and "min_supported"
+                                    (versions below it must update). Both can
+                                    be changed after publishing with
+                                    scripts/release_control.py.
 
 Both are uploaded as assets of the GitHub release tagged ``v<version>``; the
 app looks at ``releases/latest/download/latest.json``.
@@ -29,6 +35,35 @@ ROOT = Path(__file__).resolve().parent.parent
 VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 REPO = "Changplay12345/ATC-Fast-Time-Sim-Performance-Testing-Version"
 BUNDLE = ROOT / "desktop" / "src-tauri" / "target" / "release" / "bundle" / "nsis"
+POLICY = ROOT / "desktop" / "release.json"
+
+
+def _key(version: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(p) for p in version.split("."))
+    except ValueError:
+        return ()
+
+
+def release_policy() -> dict:
+    """The policy fields for the manifest, checked. A mistake here reaches
+    every installed app, so it stops the build instead."""
+    policy = json.loads(POLICY.read_text(encoding="utf-8")) if POLICY.is_file() else {}
+    rollout = policy.get("rollout", 100)
+    if not isinstance(rollout, int) or isinstance(rollout, bool) or not 0 <= rollout <= 100:
+        raise SystemExit(f"{POLICY.name}: rollout must be a whole number 0-100, not {rollout!r}")
+    out: dict = {"rollout": rollout}
+    minimum = (policy.get("min_supported") or "").strip()
+    if minimum:
+        if not _key(minimum):
+            raise SystemExit(f"{POLICY.name}: min_supported is not a version: {minimum!r}")
+        if _key(minimum) > _key(VERSION):
+            raise SystemExit(
+                f"{POLICY.name}: min_supported {minimum} is newer than this release ({VERSION}); "
+                "nobody could reach it"
+            )
+        out["min_supported"] = minimum
+    return out
 
 
 def main() -> int:
@@ -64,6 +99,7 @@ def main() -> int:
         "version": VERSION,
         "notes": notes.strip(),
         "pub_date": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        **release_policy(),
         "platforms": {
             "windows-x86_64": {
                 "signature": sig.read_text(encoding="utf-8").strip(),
@@ -74,7 +110,10 @@ def main() -> int:
     (out / "latest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     size = (out / asset).stat().st_size / 2**20
     print(f"{out / asset}  {size:.1f} MB")
-    print(f"{out / 'latest.json'}  -> v{VERSION}")
+    print(
+        f"{out / 'latest.json'}  -> v{VERSION}, rollout {manifest['rollout']} %, "
+        f"minimum supported {manifest.get('min_supported', 'none')}"
+    )
     return 0
 
 

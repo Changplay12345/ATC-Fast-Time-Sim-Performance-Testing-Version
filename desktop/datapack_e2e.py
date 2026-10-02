@@ -246,7 +246,9 @@ def main() -> int:
         broken.mkdir(parents=True)
         (broken / "pack.json").write_text(json.dumps({"schema": 1, "version": newer}), encoding="utf-8")
         (PACKS / "current.json").write_text(json.dumps({"version": newer}), encoding="utf-8")
-        app = App(exe, None)
+        # Still pointed at the local manifest (which offers nothing newer), so
+        # the real data release cannot select a pack behind this check's back.
+        app = App(exe, url)
         check("a broken selected pack does not stop the app", app.health.get("ok") is True
               and app.health.get("data_source") == "bundled", f"({app.health.get('data_version')}, {app.health.get('data_source')})")
         check("and it is deselected", selected() is None)

@@ -19,9 +19,11 @@ use std::{
 };
 
 mod datapack;
+mod diagnostics;
+mod release;
 
 use tauri::{Emitter, Manager, RunEvent};
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::UpdaterExt;
 
 /// How long the engine gets to come up (cold disk, antivirus scan of a fresh
@@ -34,8 +36,10 @@ const PAGE_ORIGINS: &str = "http://tauri.localhost,https://tauri.localhost,tauri
 
 /// The running engine, and where its PID is recorded.
 struct Engine {
+    /// `None` once the engine has been stopped on purpose.
     child: Mutex<Option<Child>>,
     pid_file: PathBuf,
+    port: u16,
 }
 
 /// A `Command` that never flashes a console window on Windows.
@@ -182,6 +186,11 @@ fn start_engine(
     let exports = data_dir.join("exports");
     fs::create_dir_all(&exports).map_err(|e| format!("cannot create {}: {e}", exports.display()))?;
     let log_path = log_dir.join("engine.log");
+    // Keep the previous run's log: when the engine crashed, that is the one
+    // that says why, and starting again must not erase it.
+    if log_path.is_file() {
+        let _ = fs::rename(&log_path, log_dir.join("engine.previous.log"));
+    }
     let log = fs::File::create(&log_path).map_err(|e| format!("cannot open engine.log: {e}"))?;
     let log_err = log.try_clone().map_err(|e| e.to_string())?;
 
@@ -271,6 +280,56 @@ fn stop_engine(app: &tauri::AppHandle) {
         }
         let _ = fs::remove_file(&state.pid_file);
     }
+}
+
+/// Notice an engine that dies while the app is open.
+///
+/// Without this the window stays up and every action fails with a network
+/// error nobody can interpret. The engine holds the session's generated
+/// flights in memory, so it cannot be quietly replaced: say what happened and
+/// offer the one thing that fixes it.
+fn watch_engine(app: &tauri::AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(1));
+        let Some(state) = app.try_state::<Engine>() else {
+            return;
+        };
+        let exited = {
+            let Ok(mut guard) = state.child.lock() else {
+                return;
+            };
+            match guard.as_mut() {
+                // Stopped on purpose: exit, update or restart.
+                None => return,
+                Some(child) => child.try_wait().ok().flatten(),
+            }
+        };
+        let Some(status) = exited else {
+            continue;
+        };
+        log::error!("the engine stopped unexpectedly ({status})");
+        let _ = app.emit("engine-down", status.to_string());
+        let restart = app
+            .dialog()
+            .message(
+                "The simulation engine stopped unexpectedly.\n\n\
+                 Files you have already exported are safe. Restart the app to continue; \
+                 if it keeps happening, use About > Export diagnostics and send the file to support.",
+            )
+            .title("ATC Fast-Time Simulation Tool")
+            .kind(MessageDialogKind::Error)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Restart now".into(),
+                "Not now".into(),
+            ))
+            .blocking_show();
+        if restart {
+            stop_engine(&app);
+            app.restart();
+        }
+        return;
+    });
 }
 
 /// Windows: never linger without a window.
@@ -434,6 +493,11 @@ fn open_licence(app: tauri::AppHandle, which: String) -> Result<(), String> {
 #[serde(rename_all = "camelCase")]
 struct UpdateCheck {
     available: bool,
+    /// This version is below the release's minimum: it must update to go on.
+    required: bool,
+    /// A newer release exists but its staged rollout has not reached this
+    /// installation yet (and the user did not ask for it).
+    held_back: bool,
     version: Option<String>,
     notes: Option<String>,
     date: Option<String>,
@@ -441,26 +505,92 @@ struct UpdateCheck {
 
 /// Ask the update server whether a newer signed release exists. Only reports;
 /// nothing is downloaded until the user asks.
+///
+/// `manual` is true when the user pressed "Check for updates": a staged
+/// rollout holds a release back from the background check, never from a
+/// person asking for it. See `release.rs`.
 #[tauri::command]
-async fn check_update(app: tauri::AppHandle) -> Result<UpdateCheck, String> {
+async fn check_update(app: tauri::AppHandle, manual: Option<bool>) -> Result<UpdateCheck, String> {
+    let manual = manual.unwrap_or(false);
     let updater = app.updater().map_err(|e| e.to_string())?;
-    match updater.check().await.map_err(|e| e.to_string())? {
-        Some(update) => {
-            log::info!("update available: {} -> {}", APP_VERSION, update.version);
-            Ok(UpdateCheck {
-                available: true,
-                version: Some(update.version.clone()),
-                notes: update.body.clone(),
-                date: update.date.map(|d| d.to_string()),
-            })
-        }
-        None => Ok(UpdateCheck {
+    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+        return Ok(UpdateCheck {
             available: false,
+            required: false,
+            held_back: false,
             version: None,
             notes: None,
             date: None,
-        }),
-    }
+        });
+    };
+    let policy = release::policy(&update.raw_json);
+    let required = release::is_required(APP_VERSION, policy.min_supported.as_deref());
+    let bucket = dirs(&app).map(|d| release::bucket(&d.0)).unwrap_or(0);
+    let offered = manual || required || release::in_rollout(bucket, policy.rollout);
+    log::info!(
+        "update {} -> {}: rollout {}%, this installation {}, minimum {}, {}{}",
+        APP_VERSION,
+        update.version,
+        policy.rollout,
+        bucket,
+        policy.min_supported.as_deref().unwrap_or("none"),
+        if offered { "offered" } else { "held back" },
+        if required { " (required)" } else { "" },
+    );
+    Ok(UpdateCheck {
+        available: offered,
+        required,
+        held_back: !offered,
+        version: offered.then(|| update.version.clone()),
+        notes: if offered { update.body.clone() } else { None },
+        date: update.date.map(|d| d.to_string()),
+    })
+}
+
+/// Zip the app's logs and a summary of versions into the exports folder and
+/// show the file. Nothing is sent anywhere. Returns the file's name.
+#[tauri::command]
+fn export_diagnostics(app: tauri::AppHandle) -> Result<String, String> {
+    let (data, logs, exports) = dirs(&app)?;
+    let health = app
+        .try_state::<Engine>()
+        .and_then(|e| http_get(e.port, "/api/health", Duration::from_secs(3)))
+        .map(|(status, body)| format!("HTTP {status} {body}"))
+        .unwrap_or_else(|| "not responding".to_string());
+    let data_status = app
+        .try_state::<datapack::DataState>()
+        .and_then(|s| serde_json::to_string(&s.status()).ok())
+        .unwrap_or_default();
+    let os = hidden(if cfg!(windows) { "cmd" } else { "uname" })
+        .args(if cfg!(windows) { vec!["/c", "ver"] } else { vec!["-a"] })
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+    let summary = format!(
+        "ATC Fast-Time Simulation Tool {APP_VERSION}\n\
+         Operating system: {os} ({} {})\n\
+         Web view: {}\n\
+         Processors: {}\n\
+         Update group: {} of 100\n\
+         Engine health: {health}\n\
+         Navigation data: {data_status}\n",
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        tauri::webview_version().unwrap_or_else(|_| "unknown".into()),
+        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(0),
+        release::bucket(&data),
+    );
+    let path = diagnostics::export(&exports, &logs, &summary)?;
+    log::info!("diagnostics exported to {}", path.display());
+    // Show it selected in the file manager, ready to attach.
+    #[cfg(windows)]
+    let _ = Command::new("explorer").arg("/select,").arg(&path).spawn();
+    #[cfg(not(windows))]
+    let _ = reveal(&exports);
+    Ok(path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default())
 }
 
 /// Download the update (its signature is verified against the public key
@@ -534,6 +664,10 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log::LevelFilter::Info)
+                // A log that only grows fills a disk in the end: keep the
+                // current file and the three before it, 5 MB each.
+                .max_file_size(5_000_000)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
@@ -547,7 +681,8 @@ pub fn run() {
             install_update,
             data_status,
             check_data_update,
-            restart_app
+            restart_app,
+            export_diagnostics
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -597,7 +732,9 @@ pub fn run() {
             app.manage(Engine {
                 child: Mutex::new(Some(started.child)),
                 pid_file,
+                port: started.port,
             });
+            watch_engine(&handle);
 
             // Created only now, and with the config injected before any page
             // script runs, so the page's very first request finds the engine.
