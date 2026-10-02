@@ -94,6 +94,10 @@ const FIRST_CHECK_MS = 3_000;
 /** Then hourly while the app is open, so a release reaches a running app the
  *  same day without the user having to restart it. */
 const RECHECK_MS = 60 * 60 * 1000;
+/** A background check that failed (no network yet at start-up, a server
+ *  hiccup) is tried again after these delays, instead of leaving the user
+ *  without the update notice until the next hourly check. */
+const RETRY_MS = [30_000, 2 * 60_000, 10 * 60_000];
 
 /**
  * Background update check for the desktop app. It only ever *reports* an
@@ -112,6 +116,8 @@ export function useDesktopUpdate(enabled: boolean): DesktopUpdate {
   // ask the same way: an update they were shown must not vanish an hour later
   // because the rollout has not reached them.
   const askedByHand = useRef(false);
+  const failures = useRef(0);
+  const retryTimer = useRef<number | undefined>(undefined);
 
   const check = useCallback(async (manual = false) => {
     if (!enabled || busy.current) return;
@@ -128,6 +134,7 @@ export function useDesktopUpdate(enabled: boolean): DesktopUpdate {
         progress: null,
         checkedAt: Date.now(),
       });
+      failures.current = 0;
     } catch (e) {
       setState((s) => ({
         ...s,
@@ -135,10 +142,22 @@ export function useDesktopUpdate(enabled: boolean): DesktopUpdate {
         error: e instanceof Error ? e.message : String(e),
         checkedAt: Date.now(),
       }));
+      // Only background checks retry by themselves; after a manual one the
+      // user has the button.
+      const delay = manual ? undefined : RETRY_MS[failures.current];
+      if (delay !== undefined) {
+        failures.current += 1;
+        window.clearTimeout(retryTimer.current);
+        retryTimer.current = window.setTimeout(() => void checkRef.current(), delay);
+      }
     } finally {
       busy.current = false;
     }
   }, [enabled]);
+  // The retry timer calls the latest `check` without `check` depending on
+  // itself.
+  const checkRef = useRef(check);
+  checkRef.current = check;
 
   const install = useCallback(async () => {
     if (!enabled || busy.current) return;
@@ -175,6 +194,7 @@ export function useDesktopUpdate(enabled: boolean): DesktopUpdate {
     return () => {
       window.clearTimeout(first);
       window.clearInterval(every);
+      window.clearTimeout(retryTimer.current);
     };
   }, [enabled, check]);
 

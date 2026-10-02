@@ -15,6 +15,11 @@ how the app reads them). They act on the release that is "latest" unless
 it can be edited in place; apps pick the change up at their next check
 (a few seconds after launch, then hourly).
 
+GitHub serves an edited or re-pointed manifest about two minutes after the
+change (measured: 105 s). Each command therefore waits until the public URL
+really serves the new state and says how long it took; ``--no-wait`` skips
+that.
+
 ``halt`` withdraws a release: the previous version becomes "latest" again and
 the halted one is marked a pre-release, so no app is offered it any more.
 Apps that already installed it keep it - there is no downgrade - so follow a
@@ -31,6 +36,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 from pathlib import Path
 
@@ -90,6 +96,32 @@ def write_manifest(tag: str, manifest: dict) -> None:
         gh("release", "upload", tag, str(path), "--clobber")
 
 
+def served() -> dict | None:
+    """The manifest installed apps are being served right now."""
+    url = f"https://github.com/{REPO}/releases/latest/download/{MANIFEST}"
+    try:
+        with urllib.request.urlopen(url, timeout=30) as r:
+            return json.load(r)
+    except (OSError, ValueError):
+        return None
+
+
+def wait_served(args: argparse.Namespace, want: dict) -> None:
+    """Block until the public URL serves a manifest whose fields equal
+    ``want`` (a key mapped to None must be absent)."""
+    if args.no_wait:
+        print("not waiting; apps see the change in about two minutes")
+        return
+    started = time.time()
+    while time.time() - started < 600:
+        now = served()
+        if now is not None and all(now.get(k) == v for k, v in want.items()):
+            print(f"apps are being served the change after {time.time() - started:.0f} s")
+            return
+        time.sleep(5)
+    raise SystemExit("the change is still not being served after 10 minutes - check the release by hand")
+
+
 def describe(manifest: dict) -> str:
     return (
         f"version {manifest.get('version')}, rollout {manifest.get('rollout', 100)} %, "
@@ -117,6 +149,8 @@ def cmd_rollout(args: argparse.Namespace) -> None:
     manifest["rollout"] = args.percent
     write_manifest(tag, manifest)
     print(f"{tag}: {describe(manifest)}")
+    if tag == latest_tag():
+        wait_served(args, {"version": manifest.get("version"), "rollout": args.percent})
 
 
 def cmd_require(args: argparse.Namespace) -> None:
@@ -135,6 +169,8 @@ def cmd_require(args: argparse.Namespace) -> None:
         manifest["min_supported"] = args.version.lstrip("v")
     write_manifest(tag, manifest)
     print(f"{tag}: {describe(manifest)}")
+    if tag == latest_tag():
+        wait_served(args, {"version": manifest.get("version"), "min_supported": manifest.get("min_supported")})
 
 
 def cmd_halt(args: argparse.Namespace) -> None:
@@ -150,6 +186,7 @@ def cmd_halt(args: argparse.Namespace) -> None:
     gh("release", "edit", tag, "--prerelease")
     print(f"{tag} halted. Apps are now served {previous}; nobody is offered {tag}.")
     print(f"Installations already on {tag} keep it: publish a fixed release next.")
+    wait_served(args, {"version": previous.lstrip("v")})
 
 
 def cmd_resume(args: argparse.Namespace) -> None:
@@ -157,10 +194,12 @@ def cmd_resume(args: argparse.Namespace) -> None:
         raise SystemExit("say which release to resume: --tag v0.4.1")
     gh("release", "edit", args.tag, "--prerelease=false", "--latest")
     print(f"{args.tag} is offered again.")
+    wait_served(args, {"version": args.tag.lstrip("v")})
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--no-wait", action="store_true", help="do not wait until the change is being served")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status").set_defaults(run=cmd_status)
     p = sub.add_parser("rollout")

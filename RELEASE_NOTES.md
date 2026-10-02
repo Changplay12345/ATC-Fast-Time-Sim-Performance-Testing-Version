@@ -1,6 +1,6 @@
-Version 0.4.0
+Version 0.4.1
 
-- New: About > Export diagnostics saves the app's logs and version details as one file to send to support. Nothing is sent automatically, and it holds none of your flight data.
-- If the simulation engine ever stops unexpectedly, the app now says so and offers to restart, instead of failing silently.
-- Updates can now be released gradually, and a critical fix can be made mandatory.
-- Logs no longer grow without limit, and the previous session's engine log is kept.
+- Fixed: if the simulation engine could not start, the app stayed running with no window and no message. It now explains what happened and closes.
+- If checking for updates or new data fails when the app starts (no connection yet), the app now tries again shortly instead of waiting for the next scheduled check.
+- A failed update check is recorded in the log, so support can see why.
+- Closing the app on a slow computer is no longer cut short.

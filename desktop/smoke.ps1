@@ -13,7 +13,8 @@
     5. the window opens, and closing it ends the app and the engine
     6. the app still ends if its internal helper window was closed first
     7. killing the app takes the engine with it (the parent watch)
-    8. the app notices when its engine dies under it
+    8. the app notices when its engine dies under it, and says so
+    9. an engine that cannot start is reported, and the app then exits
   Exits non-zero if any check failed.
 
   Closing the window: do NOT use .NET's CloseMainWindow() for this. The
@@ -57,6 +58,28 @@ public static class SmokeWin {
     return found;
   }
   public static bool Close(IntPtr h) { return PostMessage(h, 0x0010, IntPtr.Zero, IntPtr.Zero); } // WM_CLOSE
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  // A message box of the process: a visible top-level window that is neither
+  // the app's window nor its helper, or zero.
+  public static IntPtr FindBox(uint want) {
+    IntPtr found = IntPtr.Zero;
+    EnumWindows((h, l) => {
+      uint pid; GetWindowThreadProcessId(h, out pid);
+      if (pid == want && IsWindowVisible(h)) {
+        var c = new StringBuilder(256); GetClassName(h, c, 256);
+        var cls = c.ToString();
+        if (cls != "Tauri Window" && cls != "Tao Thread Event Target") { found = h; return false; }
+      }
+      return true;
+    }, IntPtr.Zero);
+    return found;
+  }
+  // Press a message box's OK: TDM_CLICK_BUTTON for a task dialog, WM_COMMAND
+  // for a classic one. Whichever kind it is ignores the other.
+  public static void PressOk(IntPtr h) {
+    PostMessage(h, 0x0466, (IntPtr)1, IntPtr.Zero);
+    PostMessage(h, 0x0111, (IntPtr)1, IntPtr.Zero);
+  }
 }
 "@
 $REAL_WINDOW = "Tauri Window"
@@ -84,6 +107,14 @@ function Start-App {
     if ($engine -and (Get-NetTCPConnection -OwningProcess $engine.ProcessId -State Listen -ErrorAction SilentlyContinue)) { break }
   }
   @{ App = $app; Engine = $engine }
+}
+function Wait-Box($app, $seconds = 20) {
+  foreach ($i in 1..($seconds * 4)) {
+    $h = [SmokeWin]::FindBox([uint32]$app.Id)
+    if ($h -ne [IntPtr]::Zero) { return $h }
+    Start-Sleep -Milliseconds 250
+  }
+  [IntPtr]::Zero
 }
 function Wait-Window($app, $class, $seconds = 30) {
   foreach ($i in 1..($seconds * 4)) {
@@ -194,6 +225,9 @@ Stop-All
 # The shell must notice (it then tells the user and offers a restart; that
 # dialog is on screen when this launch is stopped).
 $run = Start-App
+# Not before the window is up: until then the app is still starting the
+# engine, and killing it would test the next case instead of this one.
+[void](Wait-Window $run.App $REAL_WINDOW)
 $downBefore = Log-Count $ENGINE_DOWN_LINE
 Stop-Process -Id $run.Engine.ProcessId -Force
 $noticed = $false
@@ -202,6 +236,23 @@ foreach ($i in 1..40) {
   if ((Log-Count $ENGINE_DOWN_LINE) -gt $downBefore) { $noticed = $true; break }
 }
 Check "the app notices when its engine dies" $noticed
+Check "and tells the user" ((Wait-Box $run.App 10) -ne [IntPtr]::Zero)
+Stop-All
+
+# --- fifth launch: the engine cannot start ---------------------------------
+# The app must say so and exit. (Up to 0.4.0 it hung for ever with no window
+# and no message.) ATC_SELFTEST_FAIL_START makes the engine exit at once.
+$env:ATC_SELFTEST_FAIL_START = "1"
+$app = Start-Process -FilePath $Exe -PassThru
+Remove-Item Env:ATC_SELFTEST_FAIL_START
+$box = Wait-Box $app 30
+Check "an engine that cannot start is reported" ($box -ne [IntPtr]::Zero)
+if ($box -ne [IntPtr]::Zero) {
+  [SmokeWin]::PressOk($box)
+  $exited = $false
+  foreach ($i in 1..40) { Start-Sleep -Milliseconds 250; if ($app.HasExited) { $exited = $true; break } }
+  Check "and the app exits once that is acknowledged" $exited
+}
 Stop-All
 
 if ($failed) { Write-Host "`n$failed check(s) failed" -ForegroundColor Red; exit 1 }

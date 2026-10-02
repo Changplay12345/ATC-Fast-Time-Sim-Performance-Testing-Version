@@ -55,6 +55,10 @@ const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const KEEP_PACKS: usize = 2;
 const FIRST_CHECK: Duration = Duration::from_secs(8);
 const RECHECK: Duration = Duration::from_secs(6 * 60 * 60);
+/// After a check that failed (no network yet, a server hiccup): try again
+/// soon, a few times, instead of waiting for the next scheduled check.
+const RETRY: Duration = Duration::from_secs(5 * 60);
+const MAX_RETRIES: u32 = 3;
 
 #[derive(Deserialize)]
 struct Manifest {
@@ -454,9 +458,16 @@ pub fn watch(app: &tauri::AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(FIRST_CHECK);
+        let mut retries = 0;
         loop {
-            tauri::async_runtime::block_on(check_now(&app));
-            std::thread::sleep(RECHECK);
+            let status = tauri::async_runtime::block_on(check_now(&app));
+            if status.error.is_some() && retries < MAX_RETRIES {
+                retries += 1;
+                std::thread::sleep(RETRY);
+            } else {
+                retries = 0;
+                std::thread::sleep(RECHECK);
+            }
         }
     });
 }

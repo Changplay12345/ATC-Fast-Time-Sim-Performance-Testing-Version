@@ -10,6 +10,10 @@ Environment:
   ATC_PORT          port (default 8765)
   ATC_PARENT_PID    the shell's process id; the engine exits when it is gone
   ATC_LOG_LEVEL     uvicorn log level (default info)
+  ATC_SELFTEST_FAIL_START
+                    "1" makes the engine exit at once with status 3. For the
+                    smoke test only: it proves the shell reports an engine
+                    that cannot start instead of hanging.
   ATC_LOCAL_MODE, ATC_SESSION_TOKEN, ATC_OUT_DIR, ATC_GEN_WORKERS, WEB_ORIGIN
                     read by api.server
 """
@@ -59,6 +63,10 @@ def main() -> None:
     # and this call is what makes those re-runs behave as workers instead of
     # starting another server.
     multiprocessing.freeze_support()
+
+    if os.environ.get("ATC_SELFTEST_FAIL_START") == "1":
+        print("[engine] ATC_SELFTEST_FAIL_START is set: exiting as a failed start", flush=True)
+        sys.exit(3)
 
     parent = os.environ.get("ATC_PARENT_PID", "").strip()
     if parent.isdigit():

@@ -1,6 +1,6 @@
 [package]
 name = "atc-fts-desktop"
-version = "0.4.0"
+version = "0.4.1"
 description = "ATC Fast-Time Simulation Tool — desktop shell"
 authors = ["BearCat AEL Co"]
 license = "SEE LICENSE IN EULA.md"
@@ -31,3 +31,6 @@ minisign-verify = "0.2"
 sha2 = "0.10"
 base64 = "0.22"
 zip = { version = "4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+# The error box shown before the window exists (see `fatal` in lib.rs). In
+# the tree already, through the dialog plugin, with these features.
+rfd = { version = "0.16", default-features = false, features = ["common-controls-v6"] }

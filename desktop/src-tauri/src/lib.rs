@@ -353,7 +353,9 @@ fn exit_when_window_is_gone(app: &tauri::AppHandle, window: &tauri::WebviewWindo
         fn IsWindow(hwnd: isize) -> i32;
         fn GetWindowThreadProcessId(hwnd: isize, pid: *mut u32) -> u32;
     }
-    const GRACE: Duration = Duration::from_secs(3);
+    // Longer than a normal exit on a slow machine (2-3 s was measured on a
+    // CI runner; 0.3 s on a desktop), so this only ever ends a stuck one.
+    const GRACE: Duration = Duration::from_secs(6);
 
     let Ok(hwnd) = window.hwnd() else {
         log::warn!("no window handle; the window watch is off");
@@ -384,20 +386,22 @@ fn exit_when_window_is_gone(app: &tauri::AppHandle, window: &tauri::WebviewWindo
     });
 }
 
-/// A blocking native error box. Shown from its own thread: a message box must
-/// not block the event-loop thread the setup hook runs on.
-fn fatal(app: &tauri::AppHandle, message: String) {
+/// A blocking native error box for a failure before the window exists.
+///
+/// Deliberately not the dialog plugin. The plugin queues its box on the
+/// app's event loop, and while the setup hook runs that loop has not started:
+/// the box waits for the loop, the hook waits for the box, and the app sits
+/// there for ever with no window and no message (every version up to 0.4.0
+/// did exactly that when the engine failed to start). `rfd` draws the box
+/// right here, on this thread, with its own message loop.
+fn fatal(message: &str) {
     log::error!("{message}");
-    let handle = app.clone();
-    let _ = std::thread::spawn(move || {
-        handle
-            .dialog()
-            .message(message)
-            .title("ATC Fast-Time Simulation Tool")
-            .kind(MessageDialogKind::Error)
-            .blocking_show();
-    })
-    .join();
+    rfd::MessageDialog::new()
+        .set_title("ATC Fast-Time Simulation Tool")
+        .set_description(message)
+        .set_level(rfd::MessageLevel::Error)
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +517,13 @@ struct UpdateCheck {
 async fn check_update(app: tauri::AppHandle, manual: Option<bool>) -> Result<UpdateCheck, String> {
     let manual = manual.unwrap_or(false);
     let updater = app.updater().map_err(|e| e.to_string())?;
-    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+    // A failed check must leave a trace: the page only shows "could not
+    // reach the update server", and the reason is what support needs.
+    let checked = updater.check().await.map_err(|e| {
+        log::warn!("update check failed: {e}");
+        e.to_string()
+    })?;
+    let Some(update) = checked else {
         return Ok(UpdateCheck {
             available: false,
             required: false,
@@ -710,8 +720,12 @@ pub fn run() {
             let started = match attempt {
                 Ok(s) => s,
                 Err(message) => {
-                    fatal(&handle, message.clone());
-                    return Err(message.into());
+                    fatal(&format!(
+                        "{message}\n\nRestart the app. If this keeps happening, reinstall it or \
+                         send the logs folder to support."
+                    ));
+                    // A clean exit; returning the error would end in a panic.
+                    std::process::exit(1);
                 }
             };
             if let Some(reason) = &started.data_rejected {
