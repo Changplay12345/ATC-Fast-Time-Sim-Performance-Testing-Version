@@ -99,3 +99,27 @@ export function saveFlag(key: string, value: boolean): void {
     /* not persisted — the in-memory state still applies */
   }
 }
+
+/**
+ * A remembered level, 0–100 (the alert volume), kept per browser. Fails soft
+ * like the flags above; anything stored that is not a number in range is
+ * ignored rather than trusted.
+ */
+export function loadLevel(key: string, fallback: number): number {
+  try {
+    const v = window.localStorage.getItem(key);
+    if (v == null || v.trim() === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 100 ? Math.round(n) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function saveLevel(key: string, value: number): void {
+  try {
+    window.localStorage.setItem(key, String(Math.round(value)));
+  } catch {
+    /* not persisted — the in-memory state still applies */
+  }
+}

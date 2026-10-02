@@ -980,6 +980,34 @@ published with `desktop/release.json` at `rollout: 0`.
 
 `desktop/release.json` is back at `rollout: 100` for the next release.
 
+### 0.4.2: a feature release, to be received on a second machine
+
+The owner installed 0.4.1 on a laptop and asked for a visible change to
+arrive there by auto-update: the alert sound can now be turned up and down,
+not only muted.
+
+| Piece | Where |
+|---|---|
+| Volume to gain | `web/lib/cdr/sound.ts`: `alertGain(volume)` = 0.56 x (v/100) squared. 50 % (the default) is 0.14, exactly the old fixed level; 100 % is four times that; 0 is silence. Squared so the slider feels even |
+| Panel | `web/components/nav/SoundControl.tsx`: the speaker button opens mute + slider (steps of 5) + Test. Plays a sample when the slider is released, not on every step |
+| State | `MapApp.tsx`: `atc.soundVolume` (new) beside `atc.soundMuted`, read after mount; a ref holds the level in force so the alert handler is not rebuilt per slider step. Muting keeps the level; moving the slider unmutes |
+| Storage | `web/lib/mapPrefs.ts`: `loadLevel` / `saveLevel`, ignoring anything stored that is not 0-100 |
+
+**Verified in the window**, recording the gain each tone was really played
+at (a hook on `AudioParam.linearRampToValueAtTime`): default 50 % -> 0.14;
+80 % -> 0.3584; 20 % -> 0.0224; arrow key 20 -> 25 % and a sample on key
+release; muted -> "Off", Test disabled, nothing played; unmute -> 25 % (level
+kept); slider moved while muted -> unmuted at 65 %; slider at 0 -> "Off";
+Escape, a click elsewhere and opening a tab menu each close the panel; after
+a page restart 70 % was still set. 5 unit tests for the gain curve.
+
+**Bug caught by looking at the screenshot.** The update / data notice
+(fixed, top-right, z-index 3500) covered the panel, because the bar is its
+own stacking context at 2100. Fix: while a panel or dropdown is open the bar
+itself goes to 3600 (`.mnav:has(.mnav-sound-pop), .mnav:has(.mnav-pop)`).
+Re-checked with a notice on screen and overlapping: the panel was the top
+element at its four corners and centre, and the slider worked.
+
 ## 18. Where work stands
 
 **Done and verified in public:** Phases 0, 1, 2 and the account-free part of

@@ -1,6 +1,5 @@
-Version 0.4.1
+Version 0.4.2
 
-- Fixed: if the simulation engine could not start, the app stayed running with no window and no message. It now explains what happened and closes.
-- If checking for updates or new data fails when the app starts (no connection yet), the app now tries again shortly instead of waiting for the next scheduled check.
-- A failed update check is recorded in the log, so support can see why.
-- Closing the app on a slow computer is no longer cut short.
+- New: alert volume. The speaker button in the top bar now opens a small panel with a volume slider, mute, and a Test button to hear the level.
+- Muting keeps your volume, so unmuting returns to it. The setting is remembered.
+- The default level sounds the same as before; the slider can go quieter or up to four times louder.

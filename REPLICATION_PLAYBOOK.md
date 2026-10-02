@@ -516,6 +516,13 @@ looked at (a screenshot), not inferred.
 13. **Measure the delivery path's delay before relying on it.** A "halt"
     that takes effect after the cache expires is still a halt, but the
     runbook has to say two to five minutes, not "immediately".
+14. **Look at the screenshot with the other floating things on screen.** The
+    new sound panel passed every behavioural check and was hidden behind the
+    update notice. Anything that opens near a corner needs one test with the
+    notices showing, and a hit-test (`elementFromPoint`) is a cheap way to
+    assert "this is on top".
+15. **Measure sound, do not listen for it.** A test cannot hear; hooking the
+    Web Audio gain ramp records the level every tone is played at.
 
 ---
 

@@ -26,6 +26,7 @@ import {
 
 import MainNavItem from "@/components/nav/MainNavItem";
 import NavIcon from "@/components/nav/NavIcon";
+import SoundControl from "@/components/nav/SoundControl";
 import { MAIN_NAV_ITEMS } from "@/components/nav/mainNavItems";
 import type { MainNavId } from "@/components/nav/types";
 import type { Theme } from "@/lib/mapPrefs";
@@ -57,9 +58,12 @@ export interface MainNavigationProps {
   onTheme: (t: Theme) => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
-  /** Conflict-alert sound on/off. */
+  /** Conflict-alert sound: mute, level (0–100) and a sample to judge it by. */
   soundMuted?: boolean;
+  soundVolume?: number;
   onToggleSound?: () => void;
+  onSoundVolume?: (volume: number) => void;
+  onTestSound?: () => void;
   /** The on-screen frame-rate overlay (FpsMeter) on/off. */
   fpsOn?: boolean;
   onToggleFps?: () => void;
@@ -78,7 +82,10 @@ function MainNavigation({
   onZoomIn,
   onZoomOut,
   soundMuted,
+  soundVolume,
   onToggleSound,
+  onSoundVolume,
+  onTestSound,
   fpsOn,
   onToggleFps,
   onAbout,
@@ -191,20 +198,15 @@ function MainNavigation({
             <NavIcon name="fps" size={15} />
           </button>
         )}
-        {onToggleSound && (
-          <button
-            type="button"
-            className={`mnav-util-btn${soundMuted ? " active" : ""}`}
-            onClick={() => {
-              close();
-              onToggleSound();
-            }}
-            title={soundMuted ? "Unmute alert sounds" : "Mute alert sounds"}
-            aria-label={soundMuted ? "Unmute alert sounds" : "Mute alert sounds"}
-            aria-pressed={!!soundMuted}
-          >
-            <NavIcon name={soundMuted ? "volume-off" : "volume"} size={15} />
-          </button>
+        {onToggleSound && onSoundVolume && onTestSound && (
+          <SoundControl
+            muted={!!soundMuted}
+            volume={soundVolume ?? 0}
+            onToggleMute={onToggleSound}
+            onVolume={onSoundVolume}
+            onTest={onTestSound}
+            onOpen={close}
+          />
         )}
         <button
           type="button"

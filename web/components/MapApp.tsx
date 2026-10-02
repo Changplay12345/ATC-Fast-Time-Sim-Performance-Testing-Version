@@ -98,7 +98,14 @@ import LayerOptions, {
   type ProcLayerState,
 } from "@/components/LayerOptions";
 import { fetchCsvRouteIdents } from "@/lib/routeCsv";
-import { loadFlag, saveFlag, type Basemap, type Theme } from "@/lib/mapPrefs";
+import {
+  loadFlag,
+  loadLevel,
+  saveFlag,
+  saveLevel,
+  type Basemap,
+  type Theme,
+} from "@/lib/mapPrefs";
 import FpsMeter from "@/components/FpsMeter";
 import type { PreviewPoint } from "@/lib/routePreview";
 import type { TrajectoryPoint, TrajectoryResult } from "@/lib/trajectory/types";
@@ -148,7 +155,7 @@ import {
   type DeepPartial,
 } from "@/lib/cdr/config";
 import { useToasts } from "@/lib/cdr/useToasts";
-import { playAlert } from "@/lib/cdr/sound";
+import { DEFAULT_VOLUME, playAlert } from "@/lib/cdr/sound";
 import { conflictHeadline, fmtFromValue } from "@/lib/cdr/format";
 import type { CdrEvent } from "@/lib/cdr/lifecycle";
 import { applyManeuver, maneuverTiming } from "@/lib/cdr/kinematics";
@@ -739,23 +746,42 @@ export default function MapApp() {
   // UI prefs.
   const [theme, setTheme] = useState<Theme>("dark");
 
-  // Alert sound mute + the FPS overlay: remembered per browser. Read after
-  // mount — the first render also runs on the server, where there is no
-  // storage, and reading it there would make the two renders disagree.
+  // Alert sound (mute + volume) and the FPS overlay: remembered per browser.
+  // Read after mount — the first render also runs on the server, where there
+  // is no storage, and reading it there would make the two renders disagree.
   const [soundMuted, setSoundMuted] = useState(false);
+  const [soundVolume, setSoundVolumeState] = useState(DEFAULT_VOLUME);
   const [fpsOn, setFpsOn] = useState(false);
   useEffect(() => {
     setSoundMuted(loadFlag("atc.soundMuted", false));
+    setSoundVolumeState(loadLevel("atc.soundVolume", DEFAULT_VOLUME));
     setFpsOn(loadFlag("atc.fpsMeter", false));
   }, []);
-  const soundMutedRef = useRef(soundMuted);
-  soundMutedRef.current = soundMuted;
+  // What an alert is played at right now: 0 while muted. A ref, because the
+  // alert handler must not be rebuilt (and re-subscribed) on every nudge of
+  // the slider.
+  const soundLevelRef = useRef(0);
+  soundLevelRef.current = soundMuted ? 0 : soundVolume;
   const toggleSound = useCallback(() => {
     setSoundMuted((m) => {
       saveFlag("atc.soundMuted", !m);
       return !m;
     });
   }, []);
+  // Moving the slider is a statement that sound is wanted: it unmutes. Muting
+  // keeps the level, so unmuting returns to it.
+  const setSoundVolume = useCallback((v: number) => {
+    const level = Math.min(100, Math.max(0, Math.round(v)));
+    soundLevelRef.current = level;
+    setSoundVolumeState(level);
+    saveLevel("atc.soundVolume", level);
+    setSoundMuted((m) => {
+      if (m) saveFlag("atc.soundMuted", false);
+      return false;
+    });
+  }, []);
+  // A sample at the current setting, for the sound panel's slider and Test.
+  const testSound = useCallback(() => playAlert("STCA", soundLevelRef.current), []);
   const toggleFps = useCallback(() => {
     setFpsOn((on) => {
       saveFlag("atc.fpsMeter", !on);
@@ -1392,7 +1418,7 @@ export default function MapApp() {
         title,
         body,
       });
-      playAlert(e.conflict.severity, soundMutedRef.current);
+      playAlert(e.conflict.severity, soundLevelRef.current);
     },
     [nameOf, toasts],
   );
@@ -4230,7 +4256,10 @@ export default function MapApp() {
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           soundMuted={soundMuted}
+          soundVolume={soundVolume}
           onToggleSound={toggleSound}
+          onSoundVolume={setSoundVolume}
+          onTestSound={testSound}
           fpsOn={fpsOn}
           onToggleFps={toggleFps}
           onAbout={IS_DESKTOP ? openAbout : undefined}

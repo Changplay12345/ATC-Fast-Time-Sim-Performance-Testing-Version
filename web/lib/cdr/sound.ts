@@ -7,7 +7,7 @@
  *
  * The AudioContext is created lazily (browsers block it until a user gesture,
  * which the Play button provides) and reused. All of this is a no-op on the
- * server and degrades silently if Web Audio is unavailable or muted.
+ * server and degrades silently if Web Audio is unavailable or the volume is 0.
  */
 
 import type { Severity } from "./types";
@@ -28,6 +28,28 @@ function audioCtx(): AudioContext | null {
     return null;
   }
   return ctx;
+}
+
+/** The volume a fresh install starts at, 0–100. Sounds exactly as loud as the
+ *  app did before the volume could be changed. */
+export const DEFAULT_VOLUME = 50;
+
+/** Peak gain at 100 %. Four times the old fixed level (+12 dB): room to be
+ *  heard over a busy ops room, still well short of clipping a single sine. */
+const MAX_GAIN = 0.56;
+
+/**
+ * Slider position (0–100) → oscillator gain.
+ *
+ * Squared, because loudness is not linear in amplitude: with a straight line
+ * the top half of the slider would all sound "loud" and everything useful
+ * would be crammed into the bottom. 0 is silence; 50 is the level the app
+ * always had (0.14); out-of-range and non-numeric values are clamped.
+ */
+export function alertGain(volume: number): number {
+  if (!Number.isFinite(volume)) return 0;
+  const v = Math.min(100, Math.max(0, volume)) / 100;
+  return MAX_GAIN * v * v;
 }
 
 /** One short sine blip at `freq` Hz starting `at` seconds from now. */
@@ -53,13 +75,17 @@ const TONES: Record<Severity, { freq: number; beeps: number; gap: number }> = {
   MTCD: { freq: 520, beeps: 1, gap: 0 },
 };
 
-/** Play the alert tone for a severity. Muted → silent; safe to call anywhere. */
-export function playAlert(severity: Severity, muted = false): void {
-  if (muted) return;
+/**
+ * Play the alert tone for a severity at `volume` (0–100; the caller passes 0
+ * when muted). Silent at 0; safe to call anywhere.
+ */
+export function playAlert(severity: Severity, volume: number = DEFAULT_VOLUME): void {
+  const gain = alertGain(volume);
+  if (gain <= 0) return;
   const c = audioCtx();
   if (!c) return;
   if (c.state === "suspended") void c.resume();
   const { freq, beeps, gap } = TONES[severity];
   const dur = 0.11;
-  for (let i = 0; i < beeps; i++) blip(c, freq, i * (dur + gap), dur, 0.14);
+  for (let i = 0; i < beeps; i++) blip(c, freq, i * (dur + gap), dur, gain);
 }
