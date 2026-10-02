@@ -366,12 +366,26 @@ python -m pytest tests -q
 git tag data-<version> && git push origin main data-<version>
 ```
 
+To attach notes that the app shows, run it by hand instead of tagging:
+`gh workflow run data.yml -f version=<version> -f notes="what changed"`.
+
 CI builds and signs the pack and uploads it, then the manifest, to the
 `data` release (~1 minute). Installed apps find it within 6 hours or 8 s
 after their next launch, show "New navigation data is ready", and use it
 from the next start. The next app release bundles the same data, so new
 installs start with it. To withdraw a pack, publish a newer one; there is no
 downgrade path by design.
+
+Result here: pack `2026.09.03.2` published in 1 minute; the installed 0.3.0
+downloaded and verified it in 1.8 s from About > "Check for new data" and ran
+on it after "Restart now", with the program still 0.3.0.
+(DESKTOP_RELEASE_PLAN.md section 16.)
+
+**What the user does to update:** nothing but one click. The installer is run
+by hand once, for the first install. App updates: banner > "Install and
+restart"; the app downloads, closes, updates silently and reopens (per-user
+install, so no administrator prompt; no wizard). Data updates: no installer
+at all; banner > "Restart now", or simply the next start.
 
 **Prove an update end to end** (do this for the first release of any new
 product, and after touching the updater):

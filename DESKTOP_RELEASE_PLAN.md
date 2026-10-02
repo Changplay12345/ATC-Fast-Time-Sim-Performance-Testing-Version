@@ -815,17 +815,46 @@ Smoke test 11/11 on the same build.
 PowerShell 5.1 decodes a BOM-less UTF-8 file as ANSI. CI was unaffected
 (PowerShell 7). Fix: `-Encoding UTF8`.
 
+### Verified in public (2026-10-02)
+
+1. **Release 0.3.0.** CI on the clean Windows runner: shell unit tests 5/5,
+   smoke test 12/12, data-pack end-to-end test 13/13, then published. (Normal
+   window close took 2.0 s there against 0.27 s on the development PC: a slow
+   machine, under the watcher's 3 s, so the exit completed by itself. The
+   smoke test now says so explicitly if the watcher had to finish a normal
+   close.)
+2. **Fourth real app update, 0.2.3 -> 0.3.0.** Banner by itself, download
+   0 -> 100 %, closed after 7 s, back on its own as 0.3.0. With no data pack
+   published yet, About said "Could not check for new navigation data" (the
+   manifest URL answered 404) and the app ran on its bundled data.
+3. **First data pack published** with the workflow
+   (`gh workflow run data.yml -f version=2026.09.03.2 -f notes="..."`, 1
+   minute): `atc-data_2026.09.03.2.zip` (9.6 MB) and `data-manifest.json` on
+   the release tagged `data`; "latest" stayed `v0.3.0`. The manifest URL
+   answered 404 for a few seconds after the upload, then 200.
+4. **The installed 0.3.0 took it without an app update.** About > "Check for
+   new data": downloaded and verified in 1.8 s, "Navigation data 2026.09.03.2
+   has been downloaded" with the pack's notes; "Restart now" restarted the
+   app; engine then on `2026.09.03.2 (pack)`, the page served the pack's
+   `pack.json`, flights generated, 54 airport markers, "It is up to date", no
+   failed requests; the installed program still 0.3.0.
+
+Phase 2's exit criteria are met: a pack reaches an installed app without an
+app update; corrupted packs are rejected; the token header is plumbed and
+unused.
+
 ## 17. Where work stands
 
-**Done:** Phases 0, 1 and 2 (2 verified locally; see below for what is left
-to prove in public).
-
-**To finish Phase 2 in public:** release 0.3.0 (tag `v0.3.0`), update an
-installed copy to it, publish a pack (tag `data-<version>`), and watch the
-installed app take it without an app update.
+**Done and verified in public:** Phases 0, 1 and 2. Releases v0.2.0 to
+v0.3.0; four consecutive real self-updates; one data pack delivered.
 
 **Phase 3 (macOS Apple Silicon), next:** needs an Apple Developer account
-(US$99/year) and a Mac or a macOS runner. **Phase 4:** hardening.
+(US$99/year) and a Mac or a macOS runner. **Phase 4:** hardening (staged
+rollout, kill-switch, crash reports, accounts on the data service).
+
+**Small things queued for the next release:** the About hint under an
+available update now says the app updates itself with no installer to click
+through (the old text said Windows would ask to confirm, which it does not).
 
 **Loose ends**
 

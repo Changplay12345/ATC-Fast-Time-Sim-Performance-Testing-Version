@@ -181,7 +181,7 @@ export default function AboutDialog({ onClose, update, data, busy }: Props) {
               <p className="about-hint">
                 {busy
                   ? "A replay is running. Pause it to install — the app restarts."
-                  : "Windows will ask you to confirm the installer. The app restarts when it is done."}
+                  : "The app closes, updates itself and reopens. There is no installer to click through."}
               </p>
             )}
           </div>

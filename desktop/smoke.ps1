@@ -114,6 +114,16 @@ if (-not (Test-Path $Exe)) { throw "app not found: $Exe" }
 
 Stop-All
 
+# How often the shell's window watcher had to end the process itself. Once is
+# expected (the helper-window case below). More means a normal close did not
+# finish on its own on this machine - not a failure, but worth knowing.
+$shellLog = Join-Path $env:LOCALAPPDATA "th.co.bearcat.atcfts\logs\ATC Fast-Time Simulation Tool.log"
+function Watcher-Count {
+  if (-not (Test-Path $shellLog)) { return 0 }
+  @(Select-String -Path $shellLog -SimpleMatch "the window is gone but the app did not exit").Count
+}
+$watcherBefore = Watcher-Count
+
 # --- first launch: the engine, then a normal close -------------------------
 Write-Host "starting $Exe"
 $run = Start-App
@@ -141,7 +151,8 @@ if ($window -ne [IntPtr]::Zero) {
   $sw = [Diagnostics.Stopwatch]::StartNew()
   [void][SmokeWin]::Close($window)
   $ok = Wait-Gone $app 10
-  Check "closing the window ends the app and the engine" $ok "($($sw.ElapsedMilliseconds) ms)"
+  $byWatcher = (Watcher-Count) - $watcherBefore
+  Check "closing the window ends the app and the engine" $ok "($($sw.ElapsedMilliseconds) ms$(if ($byWatcher) { ', finished by the window watcher' }))"
 }
 Stop-All
 
