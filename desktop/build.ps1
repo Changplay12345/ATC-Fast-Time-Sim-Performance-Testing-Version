@@ -65,8 +65,10 @@ if (-not $SkipWeb) {
       # only the fallback baked into the bundle.
       $env:NEXT_PUBLIC_API_BASE = "http://127.0.0.1:8765"
       $env:NEXT_PUBLIC_APP_VERSION = (Get-Content (Join-Path $repo "VERSION")).Trim()
-      # Shown in the About dialog as "What's new in this version".
-      $env:NEXT_PUBLIC_RELEASE_NOTES = (Get-Content (Join-Path $repo "RELEASE_NOTES.md") -Raw).Trim()
+      # Shown in the About dialog as "What's new in this version". Read as
+      # UTF-8 explicitly: Windows PowerShell 5.1 would take a BOM-less file
+      # for ANSI and turn a dash or an accent into garbage.
+      $env:NEXT_PUBLIC_RELEASE_NOTES = (Get-Content (Join-Path $repo "RELEASE_NOTES.md") -Raw -Encoding UTF8).Trim()
       npx next build
       # The desktop front end gets its static data from the engine (which
       # bundles the same folder), so it does not ship a second copy.

@@ -1,7 +1,5 @@
-Version 0.2.3
+Version 0.3.0
 
-- Smaller download: the app no longer ships its map and navigation data twice.
-- About now opens the licence agreement and the list of third-party licences.
-- The engine serves the app's data files itself, behind the same session protection as the rest.
-- Fixed: the first procedure lookup after starting the app could fail with "not found".
-- Fixed: the app can no longer stay running in the background without a window.
+- New: navigation data now updates by itself. When a new data cycle is published the app downloads it in the background, checks it, and uses it the next time the app starts — no new installer needed.
+- A notice appears when new data is ready, with Restart now or Later.
+- About shows which navigation data is loaded and can check for new data on request.

@@ -33,17 +33,13 @@ import numpy as np
 import shapely
 from shapely.geometry import shape
 
+from trajectory_sim.datapaths import data_dir
+
 # Sector GeoJSONs live with the web app's static data so both sides of the
 # stack read the one dataset. `sectors_corrected` has the vertical limits fixed
 # against AIP Thailand ENR 2.1 / 5.1 (AIRAC 2026-07-09) — see its CORRECTIONS.md.
 # Layer order = display order in the compact label.
-_SECTORS_DIR = (
-    Path(__file__).resolve().parents[1]
-    / "web"
-    / "public"
-    / "data"
-    / "sectors_corrected"
-)
+_SECTORS_DIR = data_dir() / "sectors_corrected"
 _LAYERS: list[tuple[str, str]] = [
     ("bacc", "bacc_geo"),
     ("subsector", "bacc_subsector"),

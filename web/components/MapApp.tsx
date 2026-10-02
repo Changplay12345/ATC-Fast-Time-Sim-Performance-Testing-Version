@@ -162,8 +162,9 @@ import {
 import { usePlanScan } from "@/lib/cdr/usePlanScan";
 import AboutDialog from "@/components/desktop/AboutDialog";
 import UpdateBanner from "@/components/desktop/UpdateBanner";
+import DataBanner from "@/components/desktop/DataBanner";
 import { IS_DESKTOP } from "@/lib/backend";
-import { useDesktopUpdate } from "@/lib/desktop";
+import { useDesktopData, useDesktopUpdate } from "@/lib/desktop";
 import { makeSepMinNmAt } from "@/lib/cdr/sepMinAt";
 import { buildLosMarks } from "@/lib/cdr/losMarks";
 import {
@@ -766,6 +767,7 @@ export default function MapApp() {
   const openAbout = useCallback(() => setAboutOpen(true), []);
   const closeAbout = useCallback(() => setAboutOpen(false), []);
   const desktopUpdate = useDesktopUpdate(IS_DESKTOP);
+  const desktopData = useDesktopData(IS_DESKTOP);
   const [basemap, setBasemap] = useState<Basemap>("dark");
 
   // Flipping the theme carries the CANVAS basemap with it. The two were
@@ -4236,13 +4238,26 @@ export default function MapApp() {
         />
       )}
       {IS_DESKTOP && aboutOpen && (
-        <AboutDialog onClose={closeAbout} update={desktopUpdate} busy={sim.playing} />
+        <AboutDialog
+          onClose={closeAbout}
+          update={desktopUpdate}
+          data={desktopData}
+          busy={sim.playing}
+        />
       )}
       {/* Outside the nav bar on purpose: an update must be announced on every
           screen, including the opening one where the bar is not shown. */}
       {IS_DESKTOP && !aboutOpen && (
         <UpdateBanner update={desktopUpdate} busy={sim.playing} onDetails={openAbout} />
       )}
+      {/* Same corner as the update notice, so it waits its turn: an app update
+          restarts the app anyway, and that restart picks the new data up. */}
+      {IS_DESKTOP &&
+        !aboutOpen &&
+        desktopUpdate.status !== "available" &&
+        desktopUpdate.status !== "downloading" && (
+          <DataBanner data={desktopData} busy={sim.playing} />
+        )}
 
       {/* The workspace under the bar: the Generator rail and the map it drives.
           Everything below is one PAGE of the application — which is why the bar

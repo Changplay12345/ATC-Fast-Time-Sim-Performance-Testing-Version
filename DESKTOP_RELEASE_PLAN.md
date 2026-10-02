@@ -696,23 +696,144 @@ that one folder is.
 
 **Verified on the rebuilt 0.2.3:** smoke test 11/11 (normal close 285 ms; the guard ended a windowless app in 3.6 s and logged it). In-window test on a cold engine, three launches: no failed requests (the 404 appeared in 3 of 3 launches before the fix), 30-31 data files served by the engine, 401 without the token, traversal 404, 54 airport markers, 520 flights imported and generated. Python: `tests` 31 passed, `trajectory_sim/tests` 278 passed; front end 957 passed; type check clean.
 
-## 16. Where work stands
+### 0.2.3 released; third real update, 0.2.2 -> 0.2.3
 
-**Remaining before calling Phase 1 closed:** none blocking. Optional: an
-interactive look at the installer's licence page; the smoke test on a
-Windows 10 machine (CI's runner is Windows Server 2022/2025).
+CI run for `v0.2.3`: tests green on Linux (including the new race test);
+Windows job built, installed and smoke-tested 12/12 on the clean runner
+(the two new window checks included), then published. On the development PC
+the installed 0.2.2 showed "Version 0.2.3 is available" by itself 2 s after
+the debugger attached, downloaded 0 -> 100 %, closed after 12 s, and came
+back on its own as 0.2.3 (app and engine): licence buttons present, 54
+airport markers from engine-served data, "You are up to date", no failed
+requests.
 
-**Phase 2 (data packs), next:** pack format and manifest; the engine reads
-its data from an active-pack folder in the user data directory (falling back
-to the bundled one); the shell checks a signed data manifest, downloads,
-verifies and swaps; `data_version` in `/api/health` and the About dialog.
+One thing to watch: on the runner "closing the window ends the app" took
+3.3 s against 0.27 s locally. That is the watcher's 3 s grace plus one poll,
+so on that machine the normal exit may not have completed by itself and the
+watcher finished it. Harmless (that is what it is for), but if a user PC
+shows the same, the normal exit path deserves a look.
+
+## 16. Phase 2: navigation-data packs (0.3.0)
+
+**Goal met locally:** new navigation data reaches an installed app without a
+new installer; a damaged, forged, too-new or broken pack never gets used and
+never stops the app.
+
+### How it works
+
+```
+publisher                         installed app
+---------                         -------------
+web/public/data  --build_data_pack.py-->  atc-data_<v>.zip  + data-manifest.json
+   (+ pack.json)        signs the zip          |                    |
+                                               v                    v
+                              GitHub release tagged "data" (never "latest")
+                                                                    |
+shell, 8 s after launch and every 6 h:  GET data-manifest.json  <---+
+  newer than the data in use? app new enough?  -> GET the zip
+  size == manifest, SHA-256 == manifest, minisign signature valid for the
+  app's built-in public key  -> unzip to data-packs/<v>.partial -> rename to
+  data-packs/<v> -> write data-packs/current.json -> tell the page
+page: banner "New navigation data is ready" [Restart now] [Later]
+next start: shell passes data-packs/<v> to the engine as $ATC_DATA_DIR
+engine: uses it if it is a whole data tree, schema 1, and NEWER than its
+  bundled data; otherwise uses the bundled data and reports why
+```
+
+| Piece | Where | Notes |
+|---|---|---|
+| The data tree and its version | `web/public/data/pack.json` (`schema`, `version` = AIRAC date + build, `airac`, `min_app`) | The bundled tree describes itself the same way a pack does |
+| Engine: which tree to read | `trajectory_sim/datapaths.py` (`resolve`, `active`, `data_dir`) | The only two readers were `api/server.py::_DATA` and `airspace.py::_SECTORS_DIR`; both now ask this module. Decided once per process; workers inherit the environment |
+| Engine: report it | `/api/health`: `data_version`, `data_source` (`bundled` / `pack`), `data_pack_rejected` | The shell learns the outcome from here instead of re-implementing the rules |
+| Build + sign a pack | `scripts/build_data_pack.py` | Reproducible zip (sorted entries, fixed timestamps); signed with `tauri signer sign` and the updater key; signature goes in the manifest |
+| Shell | `desktop/src-tauri/src/datapack.rs` | Check, download, verify, unpack (no path may leave the folder; size caps), select by rename, prune to the newest two |
+| Shell wiring | `lib.rs`: `start_engine(.., pack)`, retry without the pack if the engine fails on it, deselect a rejected pack, commands `data_status` / `check_data_update` / `restart_app`, event `data-status` | |
+| Page | `web/lib/desktop.ts` (`useDesktopData`), `components/desktop/DataBanner.tsx`, data block in `AboutDialog.tsx` | The page only mirrors the shell's state |
+| Publish | `.github/workflows/data.yml`: tag `data-<version>` or manual run | Pack uploaded before the manifest; release `data` created with `--latest=false` |
+
+### Decisions and deviations from sections 3.3 and 7
+
+- **Host: a GitHub release tagged `data`**, not a Cloudflare Worker. No new
+  infrastructure; the URL is in one constant (`MANIFEST_URL`) and can move.
+  The Worker is still the plan when accounts arrive (Phase 4).
+- **One pack, not two** (`core` + `procedures`). The pack is the whole
+  `web/public/data` tree. Splitting it is a build-script change if the AIXM
+  procedures ever have to be withheld.
+- **Not in the pack yet:** aircraft performance tables and the CAT62
+  reference (`trajectory_sim/data`) stay in the program. The threshold
+  elevation table is read from the pack first if a pack carries one.
+- **Trust model = the updater's.** The manifest is not signed and not
+  trusted; the signature covers the pack and is checked against the public
+  key compiled into the app (read from the updater's config, so there is one
+  key). `ATC_DATA_MANIFEST_URL` can point the app elsewhere for tests; that is
+  safe because the signature check still applies.
+- **Applied at the next start, never live.** A running simulation keeps its
+  data.
+- **The newer of pack and bundled wins**, decided by the engine, so a program
+  update with newer data supersedes an older downloaded pack.
+- **Token header plumbed, unused:** if `data-packs/token.txt` exists its
+  content is sent as a bearer token with the manifest request. Nothing
+  creates that file.
+- No new Rust packages: `reqwest`, `rustls`, `minisign-verify`, `sha2`,
+  `base64`, `zip` were already in the tree through the updater plugin
+  (`Cargo.lock` gained 7 dependency lines, no new entries).
+
+### Verified (local build of 0.3.0)
+
+`desktop/datapack_e2e.py` - real packs, really signed, served from a local
+web server, against the built app, 13/13:
+
+| Case | Result |
+|---|---|
+| App starts on bundled data | `2026.09.03.1 (bundled)` |
+| Newer signed pack | downloaded, verified, selected 8 s after launch (9.2 MB) |
+| Running engine | not switched |
+| After restart | engine on `2026.09.03.2 (pack)`; not downloaded again |
+| One byte of the zip flipped | refused: "SHA-256 does not match" |
+| Manifest rewritten to match the altered zip | refused: "signature does not match" |
+| Signature removed | refused: "not signed" |
+| `min_app` 99.0.0 | left alone, logged |
+| Version not newer | left alone |
+| Selected pack broken on disk | app starts on bundled data; pack deselected |
+
+Unit tests: `tests/test_datapaths.py` (7: fallbacks, older-than-bundled,
+version ordering, a fresh engine process on a pack) and 5 Rust tests in
+`datapack.rs` (version ordering, folder-name safety, size/hash/no-signature
+refusal, zip path traversal, pruning).
+
+In the window (WebView2 + CDP): banner appeared by itself 7 s after launch
+("New navigation data is ready - AIRAC 2026-09-03 (2026.09.03.2)"); "Restart
+now" restarted the app; after it `/data/pack.json` served to the page was the
+pack's; 54 airport markers; flights generated; About showed "Navigation data
+2026.09.03.2 (a downloaded update). It is up to date."; no failed requests.
+Smoke test 11/11 on the same build.
+
+### Bug found in this step
+
+"What's new" in a locally built app showed a garbled dash. Cause:
+`build.ps1` read `RELEASE_NOTES.md` with `Get-Content -Raw`, which in Windows
+PowerShell 5.1 decodes a BOM-less UTF-8 file as ANSI. CI was unaffected
+(PowerShell 7). Fix: `-Encoding UTF8`.
+
+## 17. Where work stands
+
+**Done:** Phases 0, 1 and 2 (2 verified locally; see below for what is left
+to prove in public).
+
+**To finish Phase 2 in public:** release 0.3.0 (tag `v0.3.0`), update an
+installed copy to it, publish a pack (tag `data-<version>`), and watch the
+installed app take it without an app update.
+
+**Phase 3 (macOS Apple Silicon), next:** needs an Apple Developer account
+(US$99/year) and a Mac or a macOS runner. **Phase 4:** hardening.
 
 **Loose ends**
 
 - `.github/workflows/keepalive.yml` pings `trajectory-api-zf51.onrender.com`,
   an older Render service, not the one deployed this week.
 - The hosted API still cannot hold a 2,000-flight import in 512 MB.
-- Back up `%USERPROFILE%\.tauri\atc-fts-updater.key`.
+- Back up `%USERPROFILE%\.tauri\atc-fts-updater.key`. It now signs data
+  packs as well as app updates.
 - `trajectory_sim/tests/test_constraints.py::test_descent_floor_does_not_pin_climb_start`
   fails when `tests/` and `trajectory_sim/tests/` run in one pytest process
   (a threshold altitude of 1036 ft where the test expects under 1000), and
@@ -720,3 +841,5 @@ verifies and swaps; `data_version` in `/api/health` and the About dialog.
   before this work, so it is a test-isolation problem, not a regression; CI
   runs `tests/` only. Four more engine test files need `httpx`, which is not
   in `requirements.txt`.
+- The web (hosted) build does not show a data version anywhere; only the
+  desktop About does.

@@ -57,3 +57,6 @@ release/
 # Generated from EULA.md by scripts/make_installer_license.py
 desktop/installer/EULA.txt
 desktop/installer/THIRD_PARTY_NOTICES.txt
+
+# Built data packs (zip + data-manifest.json), uploaded to the "data" release
+release-data/

@@ -270,6 +270,47 @@ the engine's at start-up.
   (`exit_when_window_is_gone`). Check the handle still belongs to this
   process; handle values are reused.
 
+### C.5d Data packs: new data without a new installer
+
+Do it in this order; each step is testable before the next exists.
+
+1. **Find every reader of the data.** `grep` the engine for the data folder.
+   Here there were two (`api/server.py`, `airspace.py`). Route them through
+   one function (`trajectory_sim/datapaths.py::data_dir`).
+2. **Make the data describe itself.** A `pack.json` at the root of the tree
+   (`schema`, `version`, `airac`, `min_app`), committed with the data, so the
+   bundled tree and a downloaded pack are the same kind of thing.
+3. **Engine chooses, with a safe fallback.** `$ATC_DATA_DIR` is used only if
+   it is a whole tree, the right schema, and newer than the bundled data;
+   otherwise bundled, with the reason in `/api/health`. Test every way a pack
+   can be wrong, and one fresh process actually running on a pack.
+4. **Build + sign.** A reproducible zip (sorted entries, fixed timestamps) and
+   a manifest with URL, size, SHA-256 and the signature of the zip. Sign with
+   the updater key (`npx tauri signer sign <file>`, key from
+   `TAURI_SIGNING_PRIVATE_KEY`); the app already contains the public half.
+5. **Shell: check, download, verify, unpack, select.** Verify size, hash,
+   then signature. Unzip into `<v>.partial`, check its `pack.json` says what
+   the manifest said, rename into place, then write `current.json` through a
+   temp file + rename. Refuse zip entries that leave the folder; cap the
+   download and the unpacked size; prune to the newest two.
+6. **Start-up.** Pass the selected pack to the engine. If the engine does not
+   start on it, deselect and start again without it. If the engine reports
+   it refused the pack, deselect it.
+7. **Tell the user, apply at next start.** An event from the shell, a banner
+   with Restart now / Later, and the loaded version in About.
+8. **Test end to end against the built app** with a local web server and an
+   environment override for the manifest URL (`desktop/datapack_e2e.py`).
+   Flip a byte; then fix the manifest to match the flipped byte; remove the
+   signature; raise `min_app`; lower the version; break the unpacked folder.
+9. **Publish from CI** to a release that is never "latest", pack first and
+   manifest last.
+
+Reuse what the updater already brought in: its Rust crates (HTTP client,
+minisign, zip) are in the tree, so data packs add no new packages. Build
+`reqwest` with the same features the plugin uses, and install the TLS crypto
+provider if nobody has (`rustls::crypto::ring::default_provider()`), or the
+first request panics.
+
 ### C.6 Build, smoke test, CI
 
 - `desktop/build.ps1`: version check → licence text → freeze engine → static
@@ -287,6 +328,11 @@ the engine's at start-up.
   tag: build on Windows → smoke test on the clean runner → publish.
 - Keep `.ps1` files **ASCII-only** (Windows PowerShell 5.1 reads BOM-less
   UTF-8 as ANSI and an em dash becomes a quote).
+- The same trap when a script *reads* a text file: `Get-Content -Raw` on a
+  UTF-8 file without a BOM garbles non-ASCII in 5.1. Pass `-Encoding UTF8`.
+  (It showed as a broken dash in "What's new", only in local builds.)
+- CI also runs the shell's unit tests (`cargo test --release --lib`) and the
+  data-pack end-to-end test on the installed app before publishing.
 - A timing assertion tuned on a desktop fails on a shared runner (~4×
   slower): give CI its own budget.
 
@@ -308,6 +354,24 @@ git tag v<version> && git push origin main v<version>
 
 CI takes ~20 minutes and publishes the installer and `latest.json`.
 Installed apps find it within the hour, or at next launch.
+
+**Ship new navigation data** (no new installer)
+
+```
+# 1. update the files under web/public/data, then bump web/public/data/pack.json
+#    ("version": "<AIRAC date>.<build>", "airac", and "min_app" if the new
+#    data needs a newer app)
+python -m pytest tests -q
+# 2. commit, then
+git tag data-<version> && git push origin main data-<version>
+```
+
+CI builds and signs the pack and uploads it, then the manifest, to the
+`data` release (~1 minute). Installed apps find it within 6 hours or 8 s
+after their next launch, show "New navigation data is ready", and use it
+from the next start. The next app release bundles the same data, so new
+installs start with it. To withdraw a pack, publish a newer one; there is no
+downgrade path by design.
 
 **Prove an update end to end** (do this for the first release of any new
 product, and after touching the updater):
@@ -385,6 +449,10 @@ looked at (a screenshot), not inferred.
 | `desktop/src-tauri/src/lib.rs`, `tauri.conf.json`, `Cargo.toml` | Shell: engine lifecycle, config injection, updater, commands |
 | `desktop/build.ps1`, `desktop/smoke.ps1` | Build and smoke test |
 | `tests/test_navdata_concurrency.py` | The cold-start race test for lazily built engine state |
+| `trajectory_sim/datapaths.py`, `web/public/data/pack.json`, `tests/test_datapaths.py` | Which data tree the engine reads; the tree's own version |
+| `scripts/build_data_pack.py`, `.github/workflows/data.yml` | Build, sign and publish a data pack |
+| `desktop/src-tauri/src/datapack.rs`, `desktop/datapack_e2e.py` | Shell side of data packs and its end-to-end test |
+| `web/components/desktop/DataBanner.tsx` | "New navigation data is ready" notice |
 | `desktop/brand.json`, `desktop/icons/` | Product identity in one place |
 | `web/lib/backend.ts` (+ test) | Runtime engine address and token; the `apiFetch` guard test |
 | `web/lib/desktop.ts`, `web/components/desktop/*` | Shell bridge, update hook, About dialog, update banner |

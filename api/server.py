@@ -110,10 +110,16 @@ from trajectory_sim.validation import (
     estimate_sim_min,
 )
 from trajectory_sim.performance import UnknownAircraftPerformance
+from trajectory_sim.datapaths import active as _active_data
 
 # Project root = parent of this `api/` package.
 _ROOT = Path(__file__).resolve().parent.parent
-_DATA = _ROOT / "web" / "public" / "data"
+# The navigation-data tree: the one shipped with the program
+# (web/public/data), or the data pack the desktop shell names in
+# $ATC_DATA_DIR. Everything below reads from here, and so does the page, which
+# gets these same files from /data.
+_DATA_PACK = _active_data()
+_DATA = _DATA_PACK.path
 # Thai navdata now comes from the CAAT eAIP, parsed once per AIRAC cycle
 # into this JSON cache by scripts/ingest_aip.py (waypoints + airways).
 # Replaces the hand-curated VTPStoVTBS.csv / airway_waypoint.geojson.
@@ -487,6 +493,8 @@ def _register_field_elevations() -> None:
 # Thai AIP AD 2 runway-threshold elevation table. Repo-root file (where it
 # is maintained); trajectory_sim/data is a shipped fallback for deployment.
 _RWY_ELEV_PATHS = (
+    # A data pack may carry a newer table; none does yet.
+    _DATA / "thai_aip_ad2_thr_elevations.csv",
     _ROOT / "thai_aip_ad2_thr_elevations.csv",
     _ROOT / "trajectory_sim" / "data" / "thai_aip_ad2_thr_elevations.csv",
 )
@@ -710,8 +718,14 @@ def health() -> dict[str, object]:
         "ok": True,
         "version": __version__,
         "mode": "local" if _LOCAL_MODE else "hosted",
+        # Which navigation data is loaded, and whether it is the set shipped
+        # with the program ("bundled") or a downloaded data pack ("pack").
+        "data_version": _DATA_PACK.version,
+        "data_source": _DATA_PACK.source,
         "aip_present": _AIP_PATH.is_file(),
     }
+    if _DATA_PACK.rejected:
+        info["data_pack_rejected"] = _DATA_PACK.rejected
     if _AIP_PATH.is_file():
         try:
             aip = _aip()

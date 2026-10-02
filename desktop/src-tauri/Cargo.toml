@@ -1,6 +1,6 @@
 [package]
 name = "atc-fts-desktop"
-version = "0.2.3"
+version = "0.3.0"
 description = "ATC Fast-Time Simulation Tool — desktop shell"
 authors = ["BearCat AEL Co"]
 license = "SEE LICENSE IN EULA.md"
@@ -22,3 +22,12 @@ tauri = { version = "2.12.1", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
+# Data packs (src/datapack.rs). All of these are already in the tree through
+# the updater plugin, at these versions and with these features; naming them
+# adds no code to the build.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "system-proxy"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+minisign-verify = "0.2"
+sha2 = "0.10"
+base64 = "0.22"
+zip = { version = "4", default-features = false, features = ["deflate-flate2-zlib-rs"] }

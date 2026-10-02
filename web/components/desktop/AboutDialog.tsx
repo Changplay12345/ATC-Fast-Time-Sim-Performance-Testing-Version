@@ -19,12 +19,15 @@ import {
   openLicence,
   openLogsFolder,
   type AppInfo,
+  type DesktopData,
   type DesktopUpdate,
 } from "@/lib/desktop";
 
 interface Props {
   onClose: () => void;
   update: DesktopUpdate;
+  /** Navigation data: what is loaded and whether a newer pack is waiting. */
+  data: DesktopData;
   /** A replay or generation is in progress — hold the install button. */
   busy: boolean;
 }
@@ -60,7 +63,21 @@ function statusLine(u: DesktopUpdate): string {
   }
 }
 
-export default function AboutDialog({ onClose, update, busy }: Props) {
+function dataLine(d: DesktopData): string {
+  const s = d.status;
+  if (s?.pending) {
+    return `Navigation data ${s.pending.version} has been downloaded. It is used the next time the app starts.`;
+  }
+  if (d.checking) return "Checking for new navigation data…";
+  if (s?.error) {
+    return "Could not check for new navigation data. Check your connection and try again.";
+  }
+  if (!s?.version) return "Navigation data updates arrive automatically while the app is open.";
+  const origin = s.source === "pack" ? "a downloaded update" : "included with the app";
+  return `Navigation data ${s.version} (${origin}).${d.checkedAt ? " It is up to date." : ""}`;
+}
+
+export default function AboutDialog({ onClose, update, data, busy }: Props) {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [engine, setEngine] = useState<EngineHealth | null>(null);
 
@@ -167,6 +184,40 @@ export default function AboutDialog({ onClose, update, busy }: Props) {
                   : "Windows will ask you to confirm the installer. The app restarts when it is done."}
               </p>
             )}
+          </div>
+
+          <div
+            className={`about-update${data.status?.pending ? " about-update-available" : ""}${
+              !data.status?.pending && data.status?.error ? " about-update-error" : ""
+            }`}
+            role="status"
+          >
+            <p title={data.status?.error ?? undefined}>{dataLine(data)}</p>
+            {data.status?.pending?.notes && (
+              <pre className="about-notes">{data.status.pending.notes}</pre>
+            )}
+            <div className="about-actions">
+              {data.status?.pending ? (
+                <button
+                  type="button"
+                  className="about-btn primary"
+                  onClick={() => void data.restart()}
+                  disabled={busy}
+                  title={busy ? "Pause the replay first — this restarts the app" : undefined}
+                >
+                  Restart now
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="about-btn"
+                  onClick={() => void data.check()}
+                  disabled={data.checking}
+                >
+                  Check for new data
+                </button>
+              )}
+            </div>
           </div>
 
           {WHATS_NEW && (

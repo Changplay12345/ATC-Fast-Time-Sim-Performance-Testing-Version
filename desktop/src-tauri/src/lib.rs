@@ -18,6 +18,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod datapack;
+
 use tauri::{Emitter, Manager, RunEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_updater::UpdaterExt;
@@ -155,9 +157,22 @@ struct Started {
     child: Child,
     port: u16,
     token: String,
+    /// The navigation data the engine loaded, and whether it is the set
+    /// shipped with the program ("bundled") or a data pack ("pack").
+    data_version: Option<String>,
+    data_source: Option<String>,
+    /// Why the engine did not use the pack it was given, if it refused it.
+    data_rejected: Option<String>,
 }
 
-fn start_engine(app: &tauri::AppHandle, data_dir: &Path, pid_file: &Path) -> Result<Started, String> {
+/// Start the engine and wait until it answers. `pack` is the data pack to
+/// run on; without one the engine uses the data it was shipped with.
+fn start_engine(
+    app: &tauri::AppHandle,
+    data_dir: &Path,
+    pid_file: &Path,
+    pack: Option<&Path>,
+) -> Result<Started, String> {
     let exe = engine_exe(app).ok_or("The simulation engine is missing from the installation.")?;
     let log_dir = app
         .path()
@@ -185,9 +200,14 @@ fn start_engine(app: &tauri::AppHandle, data_dir: &Path, pid_file: &Path) -> Res
         .env("ATC_PARENT_PID", std::process::id().to_string())
         .env("ATC_OUT_DIR", &exports)
         .env("WEB_ORIGIN", PAGE_ORIGINS)
+        // Never inherited: only the pack chosen here may be used.
+        .env_remove("ATC_DATA_DIR")
         .stdin(Stdio::null())
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(log_err));
+    if let Some(pack) = pack {
+        cmd.env("ATC_DATA_DIR", pack);
+    }
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("The simulation engine could not be started: {e}"))?;
@@ -196,19 +216,27 @@ fn start_engine(app: &tauri::AppHandle, data_dir: &Path, pid_file: &Path) -> Res
     let started = Instant::now();
     loop {
         if let Some((200, body)) = http_get(port, "/api/health", Duration::from_secs(2)) {
-            let engine_version = serde_json::from_str::<serde_json::Value>(&body)
-                .ok()
-                .and_then(|v| v.get("version").and_then(|x| x.as_str()).map(str::to_owned))
-                .unwrap_or_default();
+            let health = serde_json::from_str::<serde_json::Value>(&body).unwrap_or_default();
+            let field = |name: &str| health.get(name).and_then(|x| x.as_str()).map(str::to_owned);
+            let engine_version = field("version").unwrap_or_default();
             log::info!(
-                "engine {engine_version} up on port {port} after {:?}",
-                started.elapsed()
+                "engine {engine_version} up on port {port} after {:?}, data {} ({})",
+                started.elapsed(),
+                field("data_version").as_deref().unwrap_or("?"),
+                field("data_source").as_deref().unwrap_or("?"),
             );
             if engine_version != APP_VERSION {
                 // A half-applied update or a dev build; say so in the log.
                 log::warn!("engine version {engine_version} != shell version {APP_VERSION}");
             }
-            return Ok(Started { child, port, token });
+            return Ok(Started {
+                child,
+                port,
+                token,
+                data_version: field("data_version"),
+                data_source: field("data_source"),
+                data_rejected: field("data_pack_rejected"),
+            });
         }
         if let Ok(Some(status)) = child.try_wait() {
             let _ = fs::remove_file(pid_file);
@@ -478,6 +506,28 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     app.restart();
 }
 
+/// Which navigation data is loaded, and whether a newer pack is waiting.
+#[tauri::command]
+fn data_status(app: tauri::AppHandle) -> Result<datapack::DataStatus, String> {
+    app.try_state::<datapack::DataState>()
+        .map(|s| s.status())
+        .ok_or_else(|| "the data service is not running".to_string())
+}
+
+/// Look for a newer data pack now (About > "Check for data"). A pack that is
+/// found is downloaded and verified here, and used from the next start.
+#[tauri::command]
+async fn check_data_update(app: tauri::AppHandle) -> Result<datapack::DataStatus, String> {
+    Ok(datapack::check_now(&app).await)
+}
+
+/// Restart the app (to start using a data pack that has been downloaded).
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    stop_engine(&app);
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -494,7 +544,10 @@ pub fn run() {
             open_exports_folder,
             open_licence,
             check_update,
-            install_update
+            install_update,
+            data_status,
+            check_data_update,
+            restart_app
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -506,13 +559,35 @@ pub fn run() {
             let pid_file = data_dir.join("engine.pid");
             sweep_orphan(&pid_file);
 
-            let started = match start_engine(&handle, &data_dir, &pid_file) {
+            // Run on the selected data pack if there is one. Whatever goes
+            // wrong with a pack, the app still starts: on the data it shipped
+            // with.
+            let pack = datapack::selected_pack(&data_dir);
+            let mut attempt = start_engine(&handle, &data_dir, &pid_file, pack.as_deref());
+            if let (Err(message), Some(pack)) = (&attempt, &pack) {
+                log::error!(
+                    "the engine did not start on data pack {}: {message}; starting without it",
+                    pack.display()
+                );
+                datapack::deselect(&data_dir);
+                attempt = start_engine(&handle, &data_dir, &pid_file, None);
+            }
+            let started = match attempt {
                 Ok(s) => s,
                 Err(message) => {
                     fatal(&handle, message.clone());
                     return Err(message.into());
                 }
             };
+            if let Some(reason) = &started.data_rejected {
+                log::warn!("the engine did not use the selected data pack: {reason}");
+                datapack::deselect(&data_dir);
+            }
+            app.manage(datapack::DataState::new(
+                &data_dir,
+                started.data_version.clone(),
+                started.data_source.clone(),
+            ));
             let config = serde_json::json!({
                 "mode": "local",
                 "apiBase": format!("http://127.0.0.1:{}", started.port),
@@ -541,6 +616,7 @@ pub fn run() {
             .build()?;
             #[cfg(windows)]
             exit_when_window_is_gone(&handle, &window);
+            datapack::watch(&handle);
             Ok(())
         })
         .build(tauri::generate_context!())

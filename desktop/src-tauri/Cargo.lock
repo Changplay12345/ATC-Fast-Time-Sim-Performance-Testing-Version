@@ -75,17 +75,23 @@ dependencies = [
 
 [[package]]
 name = "atc-fts-desktop"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
+ "base64 0.22.1",
  "getrandom 0.2.17",
  "log",
+ "minisign-verify",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-log",
  "tauri-plugin-updater",
+ "zip",
 ]
 
 [[package]]
@@ -5057,6 +5063,7 @@ checksum = "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
 dependencies = [
  "arbitrary",
  "crc32fast",
+ "flate2",
  "indexmap 2.14.2",
  "memchr",
 ]

@@ -1,0 +1,83 @@
+# Publish a navigation-data pack: newer data for installed apps, no new
+# installer.
+#
+#   git tag data-2026.10.01.1 && git push origin data-2026.10.01.1
+#
+# or run it by hand from the Actions tab. The pack is built from
+# web/public/data at that commit, signed with the updater key, and uploaded to
+# the release tagged `data`, whose `data-manifest.json` installed apps poll.
+# That release is never marked "latest": "latest" is the app (latest.json).
+#
+# The pack is uploaded before the manifest, so the manifest never points at a
+# file that is not there yet. Old packs stay in the release: an app that read
+# the previous manifest a moment ago can still download what it named.
+#
+# Secret needed: TAURI_SIGNING_PRIVATE_KEY (the same one desktop.yml uses).
+
+name: data-pack
+
+on:
+  push:
+    tags: ["data-*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Pack version: AIRAC date + build, e.g. 2026.10.01.1 (empty: the version in web/public/data/pack.json)"
+        required: false
+      airac:
+        description: "AIRAC cycle, e.g. 2026-10-01 (empty: from pack.json)"
+        required: false
+      notes:
+        description: "What changed (shown in the app)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      # The Tauri CLI signs the pack (`tauri signer sign`).
+      - run: npm ci
+        working-directory: desktop
+
+      - name: Build and sign the pack
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          IN_VERSION: ${{ inputs.version }}
+          IN_AIRAC: ${{ inputs.airac }}
+          IN_NOTES: ${{ inputs.notes }}
+        run: |
+          args=()
+          version="$IN_VERSION"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then version="${GITHUB_REF_NAME#data-}"; fi
+          if [ -n "$version" ]; then args+=(--version "$version"); fi
+          if [ -n "$IN_AIRAC" ]; then args+=(--airac "$IN_AIRAC"); fi
+          if [ -n "$IN_NOTES" ]; then args+=(--notes "$IN_NOTES"); fi
+          python scripts/build_data_pack.py "${args[@]}"
+          cat release-data/data-manifest.json
+
+      - name: Publish (pack first, manifest last)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view data >/dev/null 2>&1 || gh release create data \
+            --title "Navigation data" --latest=false \
+            --notes "Navigation-data packs for the desktop app. Installed apps read data-manifest.json from here; nothing in this release is meant to be downloaded by hand."
+          gh release upload data release-data/atc-data_*.zip --clobber
+          gh release upload data release-data/data-manifest.json --clobber

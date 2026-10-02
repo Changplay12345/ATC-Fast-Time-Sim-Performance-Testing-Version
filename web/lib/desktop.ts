@@ -160,3 +160,89 @@ export function useDesktopUpdate(enabled: boolean): DesktopUpdate {
 
   return { ...state, check, install };
 }
+
+// ---------------------------------------------------------------------------
+// Navigation-data packs: newer data without a new program.
+// ---------------------------------------------------------------------------
+
+/** A data pack that has been downloaded and is used from the next start. */
+export interface DataPending {
+  version: string;
+  airac?: string | null;
+  notes?: string | null;
+}
+
+export interface DataStatus {
+  /** The data the running engine loaded, e.g. "2026.09.03.1". */
+  version?: string | null;
+  /** Shipped with the program, or a downloaded pack. */
+  source?: "bundled" | "pack" | null;
+  pending?: DataPending | null;
+  /** Why the last check failed, if it did. */
+  error?: string | null;
+}
+
+export const dataStatus = () => tauri().core.invoke<DataStatus>("data_status");
+/** Looks for a newer pack now; one that is found is downloaded and verified. */
+export const checkDataUpdate = () => tauri().core.invoke<DataStatus>("check_data_update");
+export const restartApp = () => tauri().core.invoke<void>("restart_app");
+
+export interface DesktopData {
+  status: DataStatus | null;
+  checking: boolean;
+  /** When the last manual check finished. */
+  checkedAt: number | null;
+  check: () => Promise<void>;
+  restart: () => Promise<void>;
+}
+
+/**
+ * The state of the navigation data: what is loaded, and whether a newer pack
+ * has arrived. The shell checks, downloads and verifies in the background on
+ * its own schedule and announces the result with a `data-status` event; this
+ * hook only mirrors it (and lets About ask for a check right now).
+ */
+export function useDesktopData(enabled: boolean): DesktopData {
+  const [status, setStatus] = useState<DataStatus | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    let unlisten: (() => void) | undefined;
+    dataStatus()
+      .then((s) => alive && setStatus(s))
+      .catch(() => undefined);
+    tauri()
+      .event.listen<DataStatus>("data-status", (e) => setStatus(e.payload))
+      .then((off) => {
+        if (alive) unlisten = off;
+        else off();
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+      unlisten?.();
+    };
+  }, [enabled]);
+
+  const check = useCallback(async () => {
+    if (!enabled) return;
+    setChecking(true);
+    try {
+      setStatus(await checkDataUpdate());
+    } catch (e) {
+      setStatus((s) => ({ ...(s ?? {}), error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setChecking(false);
+      setCheckedAt(Date.now());
+    }
+  }, [enabled]);
+
+  const restart = useCallback(async () => {
+    if (enabled) await restartApp();
+  }, [enabled]);
+
+  return { status, checking, checkedAt, check, restart };
+}

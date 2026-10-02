@@ -97,9 +97,23 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: ./desktop/build.ps1
 
+      - name: Shell unit tests
+        run: cargo test --release --lib
+        working-directory: desktop/src-tauri
+
       - name: Smoke test the installed app
         shell: pwsh
         run: ./desktop/smoke.ps1 -Install
+
+      # Real packs, really signed, served from a local web server: a good one
+      # must be taken and used after a restart; altered, unsigned, too-new
+      # and broken ones must not.
+      - name: Data pack test on the installed app
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: python desktop/datapack_e2e.py --exe "$env:LOCALAPPDATA\ATC Fast-Time Simulation Tool\atc-fts-desktop.exe"
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
