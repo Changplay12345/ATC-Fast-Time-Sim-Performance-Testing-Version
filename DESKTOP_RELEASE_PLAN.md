@@ -1008,16 +1008,98 @@ itself goes to 3600 (`.mnav:has(.mnav-sound-pop), .mnav:has(.mnav-pop)`).
 Re-checked with a notice on screen and overlapping: the panel was the top
 element at its four corners and centre, and the slider worked.
 
-## 18. Where work stands
+## 18. Phase 3: macOS, built on GitHub's Mac runners (0.4.3)
 
-**Done and verified in public:** Phases 0, 1, 2 and the account-free part of
-Phase 4. Releases v0.2.0 to v0.4.1; six consecutive real self-updates on
-the development PC, which now runs the installed 0.4.1 on data pack
-`2026.09.03.2`.
+The owner chose to build on GitHub's hosted Apple Silicon machines (free for
+the public repository) rather than buy a Mac, and to ship **unsigned test
+builds** rather than pay for the Apple Developer account yet. Nobody on the
+project had a Mac to try the result on, so the smoke test on the runner is
+the only evidence until a tester reports back.
 
-**Blocked on the owner:** Phase 3 (macOS) needs an Apple Developer account
-(US$99/year) and a Mac or macOS runner. Crash reporting needs a Sentry
-account; the Worker update host needs a Cloudflare account.
+### What changed
+
+| Piece | Change |
+|---|---|
+| `desktop/build.ps1` | Runs under `pwsh` on macOS too: `Join-Path` everywhere (a backslash is a filename character on macOS), the venv's `bin/python`, the platform's PATH separator, `tauri build --bundles app` (the `.dmg` bundler wants an interactive desktop), then `ditto -c -k --keepParent` to zip the `.app` for people to download |
+| `scripts/make_update_manifest.py` | Assembles whatever platforms it finds: `windows-x86_64` from the NSIS installer, `darwin-aarch64` from the `.app.tar.gz` the updater uses; copies them and their `.sig` files into `release/`; `--search` for CI artifacts, `--require windows,macos` so a release cannot go out with a platform missing |
+| `.github/workflows/desktop.yml` | `build-windows` and `build-macos` jobs (each builds, unit-tests and smoke-tests its own output and uploads `release/`), then one `publish` job that writes a single `latest.json` for both and creates the release. A manual run (Actions > Run workflow) builds one or both platforms **without publishing**: the way to iterate on the Mac build from a Windows PC |
+| `desktop/smoke.sh` | The macOS smoke test: engine started, loopback only, health, version, local mode, 401 without token, docs off, engine-death notice, parent watch. Not covered: the "engine cannot start" error box (it blocks on a click) and closing the window by hand |
+| `desktop/src-tauri/src/lib.rs` | On unix, restores the engine's execute bit before spawning it, in case a copy dropped it |
+| `desktop/sidecar/engine.spec` | The `.ico` only on Windows |
+| `tauri.conf.json` | `bundle.macOS.minimumSystemVersion` 12.0 |
+| `desktop/INSTALL_MACOS.md` | What a tester does: unzip, drag to Applications, "Open Anyway" once (or `xattr -dr com.apple.quarantine`), where logs and files live |
+
+Nothing in the engine or the page needed a change: the Python engine froze
+on macOS first time (31 s), the shell compiled first time (183 s), and the
+same `datapack.rs`, `release.rs` and `diagnostics.rs` run unchanged.
+
+### What the runner showed
+
+Three manual runs of `build-macos` (2026-10-04), each about 10 minutes
+with the Rust cache warm:
+
+| Run | Build | Smoke test | Cause |
+|---|---|---|---|
+| 1 | passed: engine frozen in 31 s, shell 183 s, zip 10 s, 13 unit tests | crashed before the first check | `$3` unbound under `set -u` when `check` was called without a detail |
+| 2 | passed | 8/9: "notices when its engine dies" failed though the log showed `the engine stopped unexpectedly (signal: 9)` | `grep -c ... \|\| echo 0` printed two lines on a zero count, so the comparison was never true |
+| 3 | passed | **9/9** | |
+
+What the runner's shell log showed in those runs, beyond the checks: the
+engine up in 2.4-2.9 s on a cold start (1.4 s warm); the updater ran and
+reported `None of the fallback platforms ["darwin-aarch64-app",
+"darwin-aarch64"] were found` against the then-current latest.json (Windows
+only), which confirmed the key the Mac build looks for; the data pack
+`2026.09.03.2` was downloaded, signature-checked and unpacked on the Mac
+with no change to that code.
+
+**Release v0.4.3** (the first with both platforms): `build-windows` built,
+installed and passed its smoke test (16 checks) and data-pack test (13);
+`build-macos` built and passed its smoke test (9); `publish` assembled one
+`latest.json` with `windows-x86_64` and `darwin-aarch64` and uploaded
+`ATC-FTS_0.4.3_x64-setup.exe` (50.2 MB), `ATC-FTS_0.4.3_macos-arm64.zip`
+(85.0 MB), `ATC-FTS_0.4.3_macos-arm64.app.tar.gz` (86.6 MB) and the two
+`.sig` files. The whole run took about 25 minutes, the Windows job being
+the long one.
+
+**Windows unaffected by the two-platform manifest:** the installed 0.4.1 on
+the development PC was offered 0.4.3 two seconds after launch, downloaded,
+closed after 10 s, came back as 0.4.3 and reported "up to date" (seventh
+consecutive real self-update).
+
+**Not yet done:** nobody has opened the Mac build on a real Mac. The next
+step is a tester following `desktop/INSTALL_MACOS.md` and reporting whether
+the map draws and how a 2,000-flight import behaves in WebKit; then
+`0.4.x -> 0.4.(x+1)` on a Mac proves the updater there.
+
+### Known limits of an unsigned Mac build
+
+- First launch is blocked by Gatekeeper; the tester uses "Open Anyway" once
+  (System Settings > Privacy & Security) or removes the quarantine flag.
+  Buying the Apple Developer account (US$99/year) and notarising removes
+  this; the build pipeline is in place for it (`APPLE_SIGNING_IDENTITY`,
+  `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` secrets, read by Tauri).
+- The app must live in `/Applications` (or anywhere outside Downloads): a
+  quarantined app run from Downloads is "translocated" to a read-only path
+  and could not update itself.
+- Apple Silicon only. An Intel build is a second job on a `macos-13`
+  runner if ever needed.
+- Not yet seen by a person: the map (WebKit, not Chromium), the dialogs,
+  the About panel. The runner proves the process model, not the pixels.
+
+## 19. Where work stands
+
+**Done and verified in public:** Phases 0, 1, 2, 4a, and Phase 3 as far as
+a Windows PC can take it: a macOS build is produced, smoke-tested and
+published with every release. Releases v0.2.0 to v0.4.3; seven consecutive
+real self-updates on the development PC.
+
+**Waiting on a Mac:** a tester's first launch (map in WebKit, dialogs,
+performance) and one self-update on macOS. Notarisation (no Gatekeeper
+warning) needs the Apple Developer account, US$99/year; the pipeline reads
+the signing secrets if they are ever added.
+
+**Still blocked on accounts:** crash reporting (Sentry) and the Worker
+update host (Cloudflare).
 
 **Loose ends**
 

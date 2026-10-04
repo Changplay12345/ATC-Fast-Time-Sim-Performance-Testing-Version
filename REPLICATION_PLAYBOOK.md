@@ -347,6 +347,28 @@ first request panics.
   manifest should wait until the public URL shows the change; tests that
   follow a change should wait a few minutes or retry.
 
+### C.5f macOS without a Mac
+
+- **Build on GitHub's `macos-latest` runner** (Apple Silicon). Everything
+  that worked on Windows worked there unchanged except path handling: use
+  `Join-Path`, never a backslash in a string, and `[IO.Path]::PathSeparator`
+  for PATH. `pwsh` is preinstalled, so one `build.ps1` serves both.
+- **Skip the `.dmg`.** `tauri build --bundles app`, then `ditto -c -k
+  --keepParent` makes the zip people download; the updater uses the
+  `.app.tar.gz` Tauri signs when `createUpdaterArtifacts` is on.
+- **One `latest.json` for all platforms**: let each build job upload its
+  signed files as an artifact and have one publish job assemble the
+  manifest from all of them; refuse to publish with a platform missing.
+- **A manual workflow run that builds but does not publish** is the
+  iteration loop when no Mac is at hand; three runs got the smoke test
+  green here, each about 10 minutes with the Rust cache warm.
+- **Write the Mac smoke test in bash and mind `set -u` and `grep -c`:**
+  an optional argument needs `${3:-}`, and `grep -c` exits 1 on zero
+  matches, so `|| echo 0` prints a second line. Both bit on the first runs.
+- **Unsigned is fine for testers**, with a one-paragraph install guide
+  (`desktop/INSTALL_MACOS.md`). Notarisation is a later purchase, not a
+  rebuild.
+
 ### C.6 Build, smoke test, CI
 
 - `desktop/build.ps1`: version check → licence text → freeze engine → static
@@ -541,6 +563,7 @@ looked at (a screenshot), not inferred.
 | `desktop/src-tauri/src/release.rs`, `desktop/release.json`, `scripts/release_control.py` | Staged rollout, forced minimum version, halt/resume |
 | `web/components/desktop/RequiredUpdate.tsx` | The screen for a mandatory update |
 | `desktop/src-tauri/src/diagnostics.rs` | About > Export diagnostics |
+| `desktop/smoke.sh`, `desktop/INSTALL_MACOS.md` | macOS smoke test and the testers' install guide |
 | `desktop/brand.json`, `desktop/icons/` | Product identity in one place |
 | `web/lib/backend.ts` (+ test) | Runtime engine address and token; the `apiFetch` guard test |
 | `web/lib/desktop.ts`, `web/components/desktop/*` | Shell bridge, update hook, About dialog, update banner |
