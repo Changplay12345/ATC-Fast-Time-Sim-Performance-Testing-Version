@@ -22,7 +22,7 @@ LOG="$HOME/Library/Logs/th.co.bearcat.atcfts/ATC Fast-Time Simulation Tool.log"
 failed=0
 
 check() {  # name, ok(0/1), detail
-  if [ "$2" = 0 ]; then echo "  ok    $1 $3"; else echo "  FAIL  $1 $3"; failed=$((failed + 1)); fi
+  if [ "$2" = 0 ]; then echo "  ok    $1 ${3:-}"; else echo "  FAIL  $1 ${3:-}"; failed=$((failed + 1)); fi
 }
 stop_all() {
   pkill -9 -x atc-fts-desktop 2>/dev/null
