@@ -1,5 +1,5 @@
-Version 0.4.2
+Version 0.4.3
 
-- New: alert volume. The speaker button in the top bar now opens a small panel with a volume slider, mute, and a Test button to hear the level.
-- Muting keeps your volume, so unmuting returns to it. The setting is remembered.
-- The default level sounds the same as before; the slider can go quieter or up to four times louder.
+- New: a macOS version for Apple Silicon Macs (M1 and later), as a test build. Download the zip from the Releases page; see desktop/INSTALL_MACOS.md for the one-time "Open Anyway" step, since test builds are not signed with an Apple certificate.
+- The Mac version updates itself and receives navigation-data updates the same way as the Windows version.
+- Windows: no changes.

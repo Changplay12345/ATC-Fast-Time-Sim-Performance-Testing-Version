@@ -1,6 +1,6 @@
 [package]
 name = "atc-fts-desktop"
-version = "0.4.2"
+version = "0.4.3"
 description = "ATC Fast-Time Simulation Tool — desktop shell"
 authors = ["BearCat AEL Co"]
 license = "SEE LICENSE IN EULA.md"
