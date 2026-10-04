@@ -34,6 +34,9 @@
       "../installer/EULA.txt": "licenses/EULA.txt",
       "../installer/THIRD_PARTY_NOTICES.txt": "licenses/THIRD_PARTY_NOTICES.txt"
     },
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser",

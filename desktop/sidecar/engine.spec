@@ -17,6 +17,7 @@ engine resolves its data relative to its own source files:
 """
 
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
@@ -83,7 +84,9 @@ exe = EXE(
     strip=False,
     upx=False,
     console=True,  # the shell captures stdout/stderr into its log; hidden window
-    icon=os.path.join(ROOT, "desktop", "icons", "app.ico"),
+    # The .ico is for the Windows executable's resource; macOS takes no icon
+    # here (the engine lives inside the shell's .app, which has its own).
+    icon=os.path.join(ROOT, "desktop", "icons", "app.ico") if sys.platform == "win32" else None,
 )
 coll = COLLECT(
     exe,

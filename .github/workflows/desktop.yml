@@ -1,12 +1,17 @@
 # Tests on every push; a signed desktop release when a version tag is pushed.
 #
-#   git tag v0.2.0 && git push origin v0.2.0
+#   git tag v0.5.0 && git push origin v0.5.0
 #
-# The `release` job builds the Windows installer, smoke-tests it on the clean
-# runner, and publishes it with `latest.json` — the file installed apps poll
+# On a tag: `build-windows` and `build-macos` each build their installer,
+# smoke-test it on the clean runner and hand it over as an artifact; then
+# `publish` writes one latest.json covering both platforms and publishes
+# everything as the GitHub release. Installed apps poll that latest.json
 # (releases/latest/download/latest.json) to find out there is an update.
 #
-# Secret needed: TAURI_SIGNING_PRIVATE_KEY — the updater key generated with
+# A manual run (Actions tab > Run workflow) builds and tests without
+# publishing: the way to try a change to the macOS build without a Mac.
+#
+# Secret needed: TAURI_SIGNING_PRIVATE_KEY - the updater key generated with
 # `tauri signer generate`. Its public half is in desktop/src-tauri/tauri.conf.json;
 # an app only installs updates signed with it.
 
@@ -17,7 +22,13 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Which builds to run (nothing is published from a manual run)"
+        type: choice
+        default: macos
+        options: [macos, windows, both]
 
 permissions:
   contents: read
@@ -52,16 +63,15 @@ jobs:
         run: npx vitest run
         working-directory: web
 
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
+  build-windows:
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.platforms != 'macos')
     needs: test
     runs-on: windows-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Tag matches VERSION
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: |
           test "${GITHUB_REF_NAME}" = "v$(tr -d '[:space:]' < VERSION)" \
@@ -114,6 +124,96 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: python desktop/datapack_e2e.py --exe "$env:LOCALAPPDATA\ATC Fast-Time Simulation Tool\atc-fts-desktop.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: release/
+          if-no-files-found: error
+
+  build-macos:
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.platforms != 'windows')
+    needs: test
+    # Apple Silicon runner: the build is native arm64, which is what we ship.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches VERSION
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          test "${GITHUB_REF_NAME}" = "v$(tr -d '[:space:]' < VERSION)" \
+            || { echo "tag ${GITHUB_REF_NAME} != VERSION $(cat VERSION)"; exit 1; }
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-build.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm ci
+        working-directory: desktop
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Build the app
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: ./desktop/build.ps1
+
+      - name: Shell unit tests
+        run: cargo test --release --lib
+        working-directory: desktop/src-tauri
+
+      - name: Smoke test the built app
+        run: bash desktop/smoke.sh
+
+      - name: Shell log (for the record)
+        if: always()
+        run: cat "$HOME/Library/Logs/th.co.bearcat.atcfts/ATC Fast-Time Simulation Tool.log" 2>/dev/null || echo "(no shell log)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # One latest.json for both platforms, from the signed files the build
+      # jobs produced. A missing platform stops the release.
+      - name: Assemble the release
+        run: |
+          python scripts/make_update_manifest.py --search artifacts --require windows,macos --notes-file RELEASE_NOTES.md
+          ls -l release
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2

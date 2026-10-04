@@ -1,25 +1,30 @@
 """Assemble the files a desktop release publishes.
 
-    python scripts/make_update_manifest.py [--notes "text" | --notes-file path] [--out release]
+    python scripts/make_update_manifest.py [--notes-file path] [--out release]
+                                           [--search DIR ...] [--require windows,macos]
 
-Reads the installer and its updater signature from the Tauri bundle folder and
-writes, into ``release/``:
+Looks for the built installers and their updater signatures, copies them into
+``release/`` under names with no spaces (GitHub rewrites spaces in asset
+names, and the manifest must point at the exact URL), and writes
+``latest.json``, the file installed apps poll:
 
-  ATC-FTS_<version>_x64-setup.exe   the installer under a name with no spaces
-                                    (GitHub rewrites spaces in asset names, and
-                                    the manifest must point at the exact URL)
-  latest.json                       what the app's updater fetches:
-                                    version, notes, date, and per platform the
-                                    download URL and its signature; plus the
-                                    release policy from desktop/release.json:
-                                    "rollout" (the share of installations
-                                    offered it, 0-100) and "min_supported"
-                                    (versions below it must update). Both can
-                                    be changed after publishing with
-                                    scripts/release_control.py.
+  ATC-FTS_<version>_x64-setup.exe           Windows installer (+ .sig)
+  ATC-FTS_<version>_macos-arm64.app.tar.gz  macOS, what the updater downloads (+ .sig)
+  ATC-FTS_<version>_macos-arm64.zip         macOS, what a person downloads
+  latest.json                               version, notes, date, the release
+                                            policy (desktop/release.json),
+                                            and per platform the download URL
+                                            and its signature
 
-Both are uploaded as assets of the GitHub release tagged ``v<version>``; the
-app looks at ``releases/latest/download/latest.json``.
+Where it looks: the Tauri bundle folder and ``release/`` itself, plus any
+``--search`` folders (CI passes the folder its build jobs' artifacts were
+downloaded into, so one manifest covers both platforms). Only the platforms
+found are listed; ``--require`` makes a missing one an error.
+
+Everything in ``release/`` is uploaded as assets of the GitHub release tagged
+``v<version>``; the app looks at ``releases/latest/download/latest.json``.
+The policy fields ("rollout", "min_supported") can be changed after
+publishing with scripts/release_control.py.
 """
 
 from __future__ import annotations
@@ -34,8 +39,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 REPO = "Changplay12345/ATC-Fast-Time-Sim-Performance-Testing-Version"
-BUNDLE = ROOT / "desktop" / "src-tauri" / "target" / "release" / "bundle" / "nsis"
+BUNDLE = ROOT / "desktop" / "src-tauri" / "target" / "release" / "bundle"
 POLICY = ROOT / "desktop" / "release.json"
+
+# Updater target -> how to recognise the built file, and its published name.
+PLATFORMS = {
+    "windows-x86_64": {
+        "key": "windows",
+        "pattern": f"*_{VERSION}_x64-setup.exe",
+        "asset": f"ATC-FTS_{VERSION}_x64-setup.exe",
+    },
+    "darwin-aarch64": {
+        "key": "macos",
+        "pattern": "*.app.tar.gz",
+        "asset": f"ATC-FTS_{VERSION}_macos-arm64.app.tar.gz",
+    },
+}
+# Not in the manifest, but published beside it.
+EXTRA = [f"ATC-FTS_{VERSION}_macos-arm64.zip"]
 
 
 def _key(version: str) -> tuple[int, ...]:
@@ -66,53 +87,88 @@ def release_policy() -> dict:
     return out
 
 
+def find(search: list[Path], pattern: str) -> Path | None:
+    """The first file matching ``pattern`` under the search folders that has
+    its updater signature beside it."""
+    for folder in search:
+        if not folder.is_dir():
+            continue
+        for candidate in sorted(folder.rglob(pattern)):
+            if candidate.is_file() and candidate.with_name(candidate.name + ".sig").is_file():
+                return candidate
+    return None
+
+
+def place(src: Path, dest: Path) -> None:
+    if src.resolve() != dest.resolve():
+        shutil.copy2(src, dest)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--notes", default="")
     ap.add_argument("--notes-file")
     ap.add_argument("--out", default=str(ROOT / "release"))
     ap.add_argument("--repo", default=REPO)
+    ap.add_argument("--search", action="append", default=[], help="extra folder to look in (recursively)")
+    ap.add_argument("--require", default="", help="comma-separated: windows, macos")
     args = ap.parse_args()
 
-    installers = sorted(BUNDLE.glob(f"*_{VERSION}_x64-setup.exe"))
-    if not installers:
-        print(f"no installer for {VERSION} in {BUNDLE} — run desktop/build.ps1 first")
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    search = [Path(s) for s in args.search] + [BUNDLE, out]
+
+    # Everything in this folder is uploaded to the release: drop files left
+    # by an earlier version's build.
+    for stale in out.glob("ATC-FTS_*"):
+        if f"_{VERSION}_" not in stale.name:
+            stale.unlink()
+
+    found: dict[str, Path] = {}
+    for target, spec in PLATFORMS.items():
+        src = find(search, spec["pattern"])
+        if src is None:
+            continue
+        dest = out / spec["asset"]
+        place(src, dest)
+        place(src.with_name(src.name + ".sig"), dest.with_name(dest.name + ".sig"))
+        found[target] = dest
+    for name in EXTRA:
+        for folder in search:
+            hit = next((p for p in folder.rglob(name) if p.is_file()), None) if folder.is_dir() else None
+            if hit:
+                place(hit, out / name)
+                break
+
+    required = {k.strip() for k in args.require.split(",") if k.strip()}
+    missing = [spec["key"] for target, spec in PLATFORMS.items() if spec["key"] in required and target not in found]
+    if missing:
+        print(f"no build found for: {', '.join(missing)} (version {VERSION}; looked in {', '.join(map(str, search))})")
         return 1
-    installer = installers[0]
-    sig = installer.with_name(installer.name + ".sig")
-    if not sig.is_file():
-        print(f"{sig.name} is missing — build with TAURI_SIGNING_PRIVATE_KEY set")
+    if not found:
+        print(f"no installer for {VERSION} in {BUNDLE} - run desktop/build.ps1 first")
         return 1
 
     notes = Path(args.notes_file).read_text(encoding="utf-8") if args.notes_file else args.notes
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    asset = f"ATC-FTS_{VERSION}_x64-setup.exe"
-    # Everything in this folder is uploaded to the release: drop installers
-    # left by an earlier version's build.
-    for stale in out.glob("ATC-FTS_*-setup.exe"):
-        if stale.name != asset:
-            stale.unlink()
-    shutil.copy2(installer, out / asset)
-
     manifest = {
         "version": VERSION,
         "notes": notes.strip(),
         "pub_date": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         **release_policy(),
         "platforms": {
-            "windows-x86_64": {
-                "signature": sig.read_text(encoding="utf-8").strip(),
-                "url": f"https://github.com/{args.repo}/releases/download/v{VERSION}/{asset}",
+            target: {
+                "signature": dest.with_name(dest.name + ".sig").read_text(encoding="utf-8").strip(),
+                "url": f"https://github.com/{args.repo}/releases/download/v{VERSION}/{dest.name}",
             }
+            for target, dest in found.items()
         },
     }
     (out / "latest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    size = (out / asset).stat().st_size / 2**20
-    print(f"{out / asset}  {size:.1f} MB")
+    for dest in found.values():
+        print(f"{dest}  {dest.stat().st_size / 2**20:.1f} MB")
     print(
-        f"{out / 'latest.json'}  -> v{VERSION}, rollout {manifest['rollout']} %, "
-        f"minimum supported {manifest.get('min_supported', 'none')}"
+        f"{out / 'latest.json'}  -> v{VERSION}, platforms {', '.join(found)}, "
+        f"rollout {manifest['rollout']} %, minimum supported {manifest.get('min_supported', 'none')}"
     )
     return 0
 

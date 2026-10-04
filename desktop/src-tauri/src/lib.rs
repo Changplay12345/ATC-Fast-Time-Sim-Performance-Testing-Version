@@ -178,6 +178,18 @@ fn start_engine(
     pack: Option<&Path>,
 ) -> Result<Started, String> {
     let exe = engine_exe(app).ok_or("The simulation engine is missing from the installation.")?;
+    // macOS/Linux: the engine is a resource file inside the bundle, and a
+    // copy somewhere along the way may have dropped its execute bit.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = fs::metadata(&exe) {
+            let mode = meta.permissions().mode();
+            if mode & 0o111 == 0 {
+                let _ = fs::set_permissions(&exe, fs::Permissions::from_mode(mode | 0o755));
+            }
+        }
+    }
     let log_dir = app
         .path()
         .app_log_dir()
