@@ -29,7 +29,9 @@ stop_all() {
   pkill -9 -x atc-engine 2>/dev/null
   sleep 1
 }
-log_count() { [ -f "$LOG" ] && grep -c -F "$1" "$LOG" || echo 0; }
+# grep -c prints 0 and exits 1 when nothing matches: do not let that add a
+# second "0" line.
+log_count() { if [ -f "$LOG" ]; then grep -c -F -- "$1" "$LOG" || true; else echo 0; fi; }
 # Starts the app; sets APP_PID, ENGINE_PID and PORT (empty if the engine
 # never came up).
 start_app() {
