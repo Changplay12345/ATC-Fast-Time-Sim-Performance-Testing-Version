@@ -1086,6 +1086,40 @@ the map draws and how a 2,000-flight import behaves in WebKit; then
 - Not yet seen by a person: the map (WebKit, not Chromium), the dialogs,
   the About panel. The runner proves the process model, not the pixels.
 
+## 19a. Self-hosted on the office network, simplest form (2026-10-09)
+
+The owner wanted to compare speeds with the engine on one PC and the
+interface used from a laptop on the same Wi-Fi: deployment option 2 from
+the presentation, without any packaging.
+
+`scripts/serve_lan.ps1` does it in one go: finds the PC's network address,
+(optionally) opens ports 3000 and 8000 in Windows Firewall for the local
+subnet only, builds the front end with the engine's address baked in
+(`NEXT_PUBLIC_API_BASE` is read at build time, so a new address needs a
+new build; the script remembers which address the build was for), starts
+the engine on all interfaces in hosted mode with `WEB_ORIGIN` set to the
+page's origin (or CORS refuses every request), starts `next start`, waits
+for both, and prints the address to open on the other computer.
+
+Verified from the PC itself through the network address in a real browser
+(Edge, headless): page in 2.6 s, 520 flights imported and generated in
+7.9 s, 19 engine requests over the LAN, 54 airport markers, no failed
+requests. CORS preflight from origin `http://192.168.1.38:3000` answered
+with that origin. The laptop test is the owner's.
+
+What this is not: there is no token in hosted mode, so anyone on the same
+Wi-Fi can use the engine while it runs; the two console windows must stay
+open; the PC's firewall profile for this Wi-Fi was "Public" with the
+firewall off, so no rule was needed here (the script adds rules for any
+profile when they are missing). Packaging this as a service that starts by
+itself, with an admin guide, is the remaining work for option 2.
+
+**The desktop app and the web version are one code base.** Everything added
+for the desktop (alert volume, data served by the engine) is in the shared
+code; About, updates, data packs and diagnostics are desktop-only and do not
+render in a browser. The hosted web version on Vercel and Render has
+received every change. Testing in a browser abandons nothing.
+
 ## 19. Where work stands
 
 **Done and verified in public:** Phases 0, 1, 2, 4a, and Phase 3 as far as

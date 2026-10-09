@@ -110,6 +110,25 @@ worker, 2.6× faster with two, and an import of ~1,000+ flights is killed for
 memory (the server keeps ~0.37 MB per flight for downloads). **A traffic-day
 import does not fit the free plan** — that is why the desktop app exists.
 
+### B.2b One PC serving the office network (no cloud)
+
+`scripts/serve_lan.ps1`. The three things that bite, in order:
+
+1. **The engine's address is baked into the front end at build time.**
+   Build with `NEXT_PUBLIC_API_BASE=http://<pc-ip>:8000`; record which
+   address the build was for and rebuild when it changes.
+2. **CORS.** The browser's origin is `http://<pc-ip>:3000`; the engine's
+   allow-list covers only localhost and `*.vercel.app`, so start it with
+   `WEB_ORIGIN=http://<pc-ip>:3000`.
+3. **Firewall.** Allow TCP 3000 and 8000 inbound from `LocalSubnet` only,
+   for any profile (a home Wi-Fi is often "Public"). Check the profile's
+   state first: here it was off, and no rule was needed.
+
+Then `uvicorn api.server:app --host 0.0.0.0 --port 8000` (no `--reload`
+when others use it) and `next start`. Test from the serving PC through its
+network address, not `localhost`, in a real browser: that exercises the
+baked address, CORS and the firewall the way the other computer will.
+
 ### B.3 Vercel (the web front end)
 
 Through the REST API with a **full-scope** token (a limited token can read
