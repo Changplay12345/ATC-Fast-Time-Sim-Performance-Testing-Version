@@ -904,3 +904,60 @@ Gzip level comparison (3.09 MB response): level 1 4.3× / 24 ms, level 3
 
 `api/server.py` (gzip middleware). Render env var `ATC_GEN_WORKERS=2`.
 pytest 15 passed. Commit `4aaea05`, deployed to Render (`dep-davat6oae00c73db2me0`).
+
+---
+---
+
+# Part 5 — Resource meter: what the engine really uses (2026-10-23)
+
+To size a server (cloud, colocation or an office PC) the owner wanted a
+meter rather than estimates. `scripts/resource_meter.py` attaches to every
+engine process (server + worker pool), samples them twice a second with
+psutil, sends the same requests the page sends for "Generate all" (chunks
+of 40, up to 3 in flight per user), and writes a CSV of samples and a
+summary to `results/`.
+
+    python scripts/resource_meter.py                      # 1 user, 1,000 flights
+    python scripts/resource_meter.py --users 3 --runs 2   # 3 people at once, twice each
+    python scripts/resource_meter.py --flights 2000 --csv "dummy_data/2000 flight.csv"
+
+## 1. Results (development PC, 8 cores, 7 workers, engine 0.4.3, uvicorn without --reload)
+
+| Scenario | Time per run | Engine memory: idle → peak → kept | CPU-s per flight | Engine CPU while loaded |
+|---|---|---|---|---|
+| 1 user, 1,000 flights (500-flight file cycled) | **10.5 s** | 1.25 → 1.27 → 1.27 GB | 0.058 | 5.5 cores |
+| 3 users at once, 2 runs each, 1,000 flights | **30–35 s each** (all six done in 67 s) | 1.27 → 1.29 → 1.29 GB | 0.060 | 5.3 cores |
+| 1 user, the 2,000-flight day | **20.0 s** | 1.29 → 1.68 → 1.68 GB | 0.051 | 5.0 cores |
+
+Idle footprint before any worker has started: 0.12 GB (the server with
+navdata). Each worker ~0.15 GB once warm; the result cache grew ~0.4 GB for
+the 2,000-flight day and stays until evicted (cap 4,000 flights).
+
+## 2. What this corrects
+
+- **The engine is ~4× cheaper per flight than the planning figure.** The
+  earlier "63 s for 1,990 flights" (Part 2) was measured end to end in the
+  browser with a game using 4 cores; the engine alone, on a quiet machine,
+  does the same day in 20 s: **0.05–0.06 CPU-s per flight**, not 0.22. The
+  cloud and colocation sizing used 0.22–0.4; they are conservative by a
+  factor of 4 or more.
+- **Three users at once cost 3× the wait, as predicted** (10.5 s → 33 s),
+  with no extra memory: the workers are shared, nothing else grows.
+- **Memory is small:** 1.3–1.7 GB for the whole engine under load. A cloud
+  instance's bill at US$10/GB-month is US$13–17/month for this footprint,
+  US$1–2 if idle workers are shut down.
+- The "whole machine, peak used 21 GB" lines are the development PC's other
+  programs, not the engine.
+
+## 3. Gotcha
+
+B25: the meter's CPU-% column read 0 on the first run. `psutil`'s
+`cpu_percent(None)` measures since the *same handle's* previous call, and
+the sampler was building fresh `Process` handles every tick. Keep one
+handle per PID. (The CPU-seconds figure, from absolute `cpu_times`, was
+right all along.)
+
+## 4. Files
+
+`scripts/resource_meter.py` (new; needs `psutil` in the venv), `results/`
+(ignored).

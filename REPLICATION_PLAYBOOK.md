@@ -71,6 +71,15 @@ Pin **deck.gl at exactly 9.3.11** (9.4.0 crashed the WebGL context).
 
 ---
 
+### A.4 Measure before sizing
+
+`scripts/resource_meter.py` (PERFORMANCE_NOTES.md Part 5): attach to the
+engine's processes, drive it the way the page does, report idle/peak/kept
+memory, CPU-seconds per flight and the wait per user. Run it with the real
+traffic files and with 3–4 simultaneous users before writing any server
+proposal: the engine turned out ~4× cheaper per flight than the browser-side
+figure the first proposals were built on.
+
 ## Part B — Git, GitHub, hosting
 
 ### B.1 GitHub

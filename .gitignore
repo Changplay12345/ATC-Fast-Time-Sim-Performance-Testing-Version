@@ -60,3 +60,6 @@ desktop/installer/THIRD_PARTY_NOTICES.txt
 
 # Built data packs (zip + data-manifest.json), uploaded to the "data" release
 release-data/
+
+# Resource meter output (scripts/resource_meter.py)
+results/
