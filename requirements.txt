@@ -12,6 +12,9 @@ numpy==2.1.3
 # Web API (lets the Next.js app call the real Python pipeline)
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
+# The engine's own resource meter (/api/resources): memory and CPU of the
+# server and its workers, for sizing a machine.
+psutil==7.2.2
 
 # Testing
 pytest==8.3.4

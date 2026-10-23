@@ -169,6 +169,7 @@ import {
 import { usePlanScan } from "@/lib/cdr/usePlanScan";
 import AboutDialog from "@/components/desktop/AboutDialog";
 import UpdateBanner from "@/components/desktop/UpdateBanner";
+import ServerLoadPanel from "@/components/ServerLoadPanel";
 import DataBanner from "@/components/desktop/DataBanner";
 import RequiredUpdate from "@/components/desktop/RequiredUpdate";
 import { IS_DESKTOP } from "@/lib/backend";
@@ -794,6 +795,14 @@ export default function MapApp() {
   const openAbout = useCallback(() => setAboutOpen(true), []);
   const closeAbout = useCallback(() => setAboutOpen(false), []);
   const desktopUpdate = useDesktopUpdate(IS_DESKTOP);
+  // The engine's own resource meter (works for any engine: desktop, LAN
+  // server, cloud). Opened from the Tool menu and from About.
+  const [serverLoadOpen, setServerLoadOpen] = useState(false);
+  const openServerLoad = useCallback(() => {
+    setAboutOpen(false);
+    setServerLoadOpen(true);
+  }, []);
+  const closeServerLoad = useCallback(() => setServerLoadOpen(false), []);
   const desktopData = useDesktopData(IS_DESKTOP);
   const [basemap, setBasemap] = useState<Basemap>("dark");
 
@@ -4058,6 +4067,10 @@ export default function MapApp() {
               setFilterOpen((v) => !v);
               close();
             }}
+            onServerLoad={() => {
+              openServerLoad();
+              close();
+            }}
           />
         ),
       },
@@ -4273,7 +4286,11 @@ export default function MapApp() {
           update={desktopUpdate}
           data={desktopData}
           busy={sim.playing}
+          onServerLoad={openServerLoad}
         />
+      )}
+      {serverLoadOpen && (
+        <ServerLoadPanel onClose={closeServerLoad} hasFlights={trajectories.length > 0} />
       )}
       {/* Outside the nav bar on purpose: an update must be announced on every
           screen, including the opening one where the bar is not shown. */}

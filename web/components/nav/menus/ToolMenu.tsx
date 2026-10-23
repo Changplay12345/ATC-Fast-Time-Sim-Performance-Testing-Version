@@ -38,6 +38,8 @@ export interface ToolMenuProps {
   measurePicked: number;
   filterOpen: boolean;
   onFilter: () => void;
+  /** Opens the Server load panel (engine memory, CPU, simulated users). */
+  onServerLoad: () => void;
 }
 
 const COLOR_BY: { id: ColorBy; label: string; hint: string }[] = [
@@ -123,6 +125,7 @@ function ToolMenu({
   measurePicked,
   filterOpen,
   onFilter,
+  onServerLoad,
 }: ToolMenuProps) {
   return (
     <>
@@ -230,6 +233,22 @@ function ToolMenu({
           <span className="mnav-row-text">
             <span className="mnav-row-title">Filter</span>
             <span className="mnav-row-meta">by type, level, airport…</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          role="menuitem"
+          className="mnav-row"
+          onClick={onServerLoad}
+          title="What the simulation engine is using, and a test with several users at once"
+        >
+          <span className="mnav-row-ico">
+            <NavIcon name="chart" size={15} />
+          </span>
+          <span className="mnav-row-text">
+            <span className="mnav-row-title">Server load</span>
+            <span className="mnav-row-meta">memory, CPU, simulate users</span>
           </span>
         </button>
       </div>

@@ -43,6 +43,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+from api.resources import LoadTest as _LoadTest, Sampler as _Sampler
 from api.version import __version__
 
 from trajectory_sim.fpl import FlightPlan, parse_eobt, parse_route
@@ -3321,6 +3322,62 @@ def _batch_worker(spec: GenerateRequest) -> tuple[str, object]:
 @app.on_event("shutdown")
 def _stop_gen_pool() -> None:
     _drop_gen_pool()
+
+
+# --- Resource meter ---------------------------------------------------------
+# What this engine uses, measured on the machine it runs on, so a server can
+# be chosen from the app's own "Server load" panel instead of from estimates.
+_RESOURCES = _Sampler()
+_LOADTEST = _LoadTest(_RESOURCES)
+
+
+@app.on_event("startup")
+def _start_resource_meter() -> None:
+    _RESOURCES.start()
+
+
+@app.get("/api/resources")
+def resources() -> dict[str, object]:
+    """Memory and CPU of the engine (server + workers), ten minutes of
+    history, the machine's totals, and the state of any load test."""
+    snap = _RESOURCES.snapshot()
+    snap["engine"]["workers_configured"] = _gen_workers()
+    snap["engine"]["workers_running"] = max(0, int(snap["engine"]["processes"]) - 1)
+    snap["cache"] = {"entries": len(_EXPORT_CACHE), "cap": _EXPORT_CACHE_MAX}
+    snap["load_test"] = _LOADTEST.status()
+    snap["version"] = __version__
+    return snap
+
+
+class LoadTestRequest(BaseModel):
+    """POST body for /api/loadtest. Bounded: this runs real generation."""
+
+    users: int = Field(1, ge=1, le=4, description="people running at the same time")
+    runs: int = Field(1, ge=1, le=3, description="runs per user, one after another")
+    flights: int = Field(1000, ge=40, le=2000, description="flights per run")
+
+
+@app.post("/api/loadtest", status_code=202)
+def start_loadtest(req: "LoadTestRequest | None" = None) -> dict[str, object]:
+    """Replay flights this engine has already built, as N simultaneous users
+    each doing a "Generate all". Results are discarded; the figures land in
+    ``/api/resources`` under ``load_test``. No body = the defaults."""
+    req = req or LoadTestRequest()
+    if _LOADTEST.running():
+        raise HTTPException(409, "A load test is already running.")
+    # The most recently generated flights, newest first, with their original
+    # requests (what the page sent); cycled up to the size asked for.
+    pool = [e["request"] for e in reversed(_EXPORT_CACHE.values()) if e.get("request") is not None]
+    if not pool:
+        raise HTTPException(409, "Generate some flights first; the test replays them.")
+    specs = [pool[i % len(pool)] for i in range(req.flights)]
+
+    def discard(keys: list[str]) -> None:
+        for k in keys:
+            _EXPORT_CACHE.pop(k, None)
+
+    _LOADTEST.start(req.users, req.runs, specs, _run_batch, discard)
+    return {"started": True, "users": req.users, "runs": req.runs, "flights": req.flights}
 
 
 _MEDIA = {

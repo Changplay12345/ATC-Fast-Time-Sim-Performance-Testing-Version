@@ -80,6 +80,14 @@ traffic files and with 3–4 simultaneous users before writing any server
 proposal: the engine turned out ~4× cheaper per flight than the browser-side
 figure the first proposals were built on.
 
+Then put the meter *in* the product (Part 5 §4): a sampler thread in the
+engine, `GET /api/resources`, a bounded `POST /api/loadtest` that replays
+cached requests and discards the results, and a panel with the same sizing
+arithmetic. A meter the user can open on any server beats one the developer
+runs once. Make the panel show the whole machine's memory and CPU next to
+the engine's: the first in-app run was on a machine with 3 GB free, and
+that tile was the only thing that explained the numbers.
+
 ## Part B — Git, GitHub, hosting
 
 ### B.1 GitHub

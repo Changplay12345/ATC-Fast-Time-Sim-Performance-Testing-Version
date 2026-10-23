@@ -31,6 +31,8 @@ interface Props {
   data: DesktopData;
   /** A replay or generation is in progress — hold the install button. */
   busy: boolean;
+  /** Opens the Server load panel (the engine's resource meter). */
+  onServerLoad?: () => void;
 }
 
 interface EngineHealth {
@@ -78,7 +80,7 @@ function dataLine(d: DesktopData): string {
   return `Navigation data ${s.version} (${origin}).${d.checkedAt ? " It is up to date." : ""}`;
 }
 
-export default function AboutDialog({ onClose, update, data, busy }: Props) {
+export default function AboutDialog({ onClose, update, data, busy, onServerLoad }: Props) {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [engine, setEngine] = useState<EngineHealth | null>(null);
   // "busy" | the exported file's name | an error message
@@ -247,6 +249,11 @@ export default function AboutDialog({ onClose, update, data, busy }: Props) {
             <button type="button" className="about-btn" onClick={() => void openExportsFolder()}>
               Open exports folder
             </button>
+            {onServerLoad && (
+              <button type="button" className="about-btn" onClick={onServerLoad} title="Engine memory and CPU, and a test with several users at once">
+                Server load
+              </button>
+            )}
             <button
               type="button"
               className="about-btn"

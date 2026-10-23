@@ -957,7 +957,41 @@ the sampler was building fresh `Process` handles every tick. Keep one
 handle per PID. (The CPU-seconds figure, from absolute `cpu_times`, was
 right all along.)
 
-## 4. Files
+## 4. Embedded in the app (0.4.4): "Server load"
 
-`scripts/resource_meter.py` (new; needs `psutil` in the venv), `results/`
-(ignored).
+The owner wanted the meter inside the software, so anyone can check any
+server from the screen. Same arithmetic as the script, measured by the
+engine itself:
+
+| Piece | Where | What it does |
+|---|---|---|
+| Sampler | `api/resources.py` `Sampler` | A thread adds up RSS and CPU of the server process and its children every 2 s, keeps 10 minutes of history and the idle/peak footprint. One `psutil.Process` handle per PID (a fresh handle reads 0 % CPU: bug B25 again). Started on app startup; a snapshot before the first tick samples on the spot |
+| Load test | `api/resources.py` `LoadTest` | N user threads, each running the page's own pattern (chunks of 40, first alone, then 3 in flight) through `_run_batch`; replays the requests kept in the export cache (newest first, cycled), with `flight_index` from 10,000,000 so keys never collide with real flights; every result's key is popped from the cache afterwards. Reports wait per run, CPU-s per flight (from absolute `cpu_times`), memory before/peak/after |
+| Endpoints | `GET /api/resources`, `POST /api/loadtest` (users ≤ 4, runs ≤ 3, flights ≤ 2,000, one at a time, 409 without flights to replay) | Behind the session token in local mode like every `/api/` route |
+| Page | `web/lib/resources.ts` (`sizing()`), `web/components/ServerLoadPanel.tsx` | Live facts, a to-scale 10-minute chart (memory area, CPU line), the test form, results table and the sizing block. Polls every 2 s (1 s while a test runs). Opened from Tool > Server load, and About > Server load on the desktop |
+| Dependency | `psutil==7.2.2` in `requirements.txt` | Goes into the frozen engine (PyInstaller has a hook for it) |
+
+Verified in a real browser against the dev servers: the panel opened from
+the Tool menu, showed the engine at 0.34 GB / 1 worker, drew the chart, ran
+a 2-user × 500-flight test to completion (progress bar, then the table),
+and printed the sizing lines; Escape closed it; no page errors. Tests:
+`tests/test_resources.py` (endpoint shape, token gate, 409 without flights,
+sampler extremes, a load test with a fake batch function counting every
+replayed flight and every discarded key).
+
+**What the first in-app run showed, and why it matters.** The machine was
+at 30.2 of 31.6 GB (five Android-emulator instances, a browser, Discord)
+and 100 % CPU. The engine's memory-aware worker count had therefore
+started **one** worker, and the 2-user test took 89 s per 500 flights
+instead of ~5 s. Correct behaviour, and precisely the condition a meter is
+for: the script runs earlier the same day, with the machine quiet, had 7
+workers and 10.5 s per 1,000 flights. Always read the "Whole machine" tile
+before trusting a timing.
+
+## 5. Files
+
+`api/resources.py`, `api/server.py` (endpoints), `web/lib/resources.ts`,
+`web/components/ServerLoadPanel.tsx`, `web/components/nav/menus/ToolMenu.tsx`,
+`web/components/desktop/AboutDialog.tsx`, `web/components/MapApp.tsx`,
+`web/app/globals.css`, `tests/test_resources.py`, `scripts/resource_meter.py`
+(the standalone version; needs `psutil` in the venv), `results/` (ignored).
