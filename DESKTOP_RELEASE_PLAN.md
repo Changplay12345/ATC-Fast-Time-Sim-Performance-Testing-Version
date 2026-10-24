@@ -1151,3 +1151,88 @@ update host (Cloudflare).
   in `requirements.txt`.
 - The web (hosted) build does not show a data version anywhere; only the
   desktop About does.
+
+## 20. Hosting proposals and server hardware (2026-10-22 to 10-24)
+
+The owner was asked for one proposal per deployment method (cloud,
+colocation, desktop). This section records the planning numbers and the
+documents, so the complete version can reuse them instead of re-deriving.
+
+### Deliverables (outside the repo, under `D:\ATC\`)
+
+| File | What | How it was made |
+|---|---|---|
+| `FTS_Deployment_Options.pptx` | 8 slides: the three deployment methods; slide 8 = local server hardware comparison (incl. the owner's 9800X3D PC, upload time, FPS, 3–4 users) | python-pptx; the helper lived in the session scratchpad and is gone (lesson below) |
+| `Cloud_Hosting_Proposal.pdf` | 2-page A4, white clean, plain language for the owner's boss: Railway Pro, Singapore, 15 months | HTML page printed with Playwright `page.pdf` (Edge, `channel: "msedge"`) |
+| `FTS_1U_Servers.pptx` | 2 slides, white clean: every 1U server considered for colocation, with same-size product photos, CPU, 1,000-flight time for 1 / 3 users, est. price incl. VAT, notes | `scripts/decks/make_1u_slides.py` (in the repo now) + `scripts/decks/export_slides.ps1` to check as PNG |
+
+### Planning numbers (all in `PERFORMANCE_NOTES.md` Part 5 and the proposal)
+
+- Engine cost measured, not estimated: 0.05–0.06 CPU-s per flight, 1.3–1.7 GB
+  for the whole engine; 1,000 flights ≈ 10.5 s alone, 30–35 s each with 3
+  users at once on the 8-core development PC.
+- Load assumption for proposals: ≤ 10 users, 2–4 active per day, ~10 runs of
+  1,000 flights each, sized for more.
+- Cloud (Railway Pro, `asia-southeast1`): 15 months budget ฿35,000, expected
+  ≈ ฿11,000 (≈ ฿720/month); scenarios ฿11,000 / ฿22,500 / ฿32,600 at ฿34/USD.
+- Colocation (1U, Thailand): NIPA ≈ ฿3,500/month incl. 1 A and 1 Gbps
+  domestic, accepts towers and mini-PCs; KIRZ ฿3,500–4,000; ReadyIDC ≈ ฿2,000;
+  P&T ≈ ฿2,500. 15 months ≈ ฿115,000–145,000 including the server, versus
+  cloud ฿11,000–33,000; cloud wins at this load, colocation wins only if the
+  hardware is wanted anyway.
+- No GPU on the server: clients render the map; the engine is CPU + RAM only.
+- Server speed is per-core speed × enough cores, and the engine tops out
+  around 8–16 workers. AM5 16-core boxes (EPYC 4545P / Ryzen 9 9950X) are
+  about twice as fast as any Xeon E-2400 (8-core ceiling) server and cheaper;
+  Xeon Scalable / EPYC 9004 / Threadripper are slower per core or pay for
+  memory channels and PCIe lanes the engine never uses.
+- Dell R260 facts (the owner was advised to buy one): Xeon E-2400 up to 8
+  cores, CPU replaceable, max 128 GB = 4 × 32 GB DDR5 ECC UDIMM, single
+  450 W PSU, iDRAC9 Enterprise needed for a remote console. Verified anchor:
+  4-core base ฿62,800 + VAT (dell.co.th). Recommended CPUs E-2468 / E-2478
+  (pick) / E-2488 at ≈ ฿18–29k each; with 128 GB ≈ ฿135–167k incl. VAT.
+  R360 = same CPUs with redundant PSUs, often the same quote.
+- The 1U list on the slides: Tier 1 Supermicro AS-1015A-MT, ASRock Rack
+  1U4LW-B650/2L2T, Gigabyte R113-C10 (all 16-core AM5, ≈ 6 s / 17 s), ASUS
+  RS300-E12-PS4 (Intel 8C, iKVM included); Tier 2 Dell R260 / R360, HPE DL20
+  Gen11, Lenovo SR250 V3, Fujitsu RX1330 M6 (all E-2478, ≈ 12 s / 38 s,
+  ฿100–140k); Tier 3 EPYC 9124 and Xeon 6 boxes (฿200k+, not worth it).
+  Every price except the Dell anchor is an estimate.
+
+### How the 1U server deck is built (reusable)
+
+1. Vendor photos go in `D:\ATC\deck_assets\srv_img\` (never in the repo; they
+   are vendor marketing images). The script crops near-white margins, fits
+   every photo into one 900 × 420 white tile, and places each tile at the
+   same 1.45 × 0.68 in box, so the pictures are the same size by
+   construction. Rows without a photo get a grey labelled tile instead.
+2. `pip install python-pptx pillow`, then
+   `python scripts/decks/make_1u_slides.py [assets_dir] [out.pptx]`.
+   Layout is manual (text boxes + connector rules, no pptx table) so row
+   heights cannot drift when text wraps and the photo boxes stay aligned.
+3. `powershell -File scripts/decks/export_slides.ps1 -Deck <pptx> -OutDir <dir>`
+   exports `slide1.png`, `slide2.png` through PowerPoint COM; look at them
+   before sending (two overlaps were only visible this way).
+4. Style that was accepted: white background, Arial, dark #1F2937 text,
+   muted #6B7280, accent #0B7285 for tier headings and times, 0.75 pt
+   #D1D5DB rules. Write prices as "THB 95,000 - 115,000": the baht glyph
+   renders tiny in Arial on slides.
+
+Where the photos came from (what worked): Supermicro, ASRock Rack, Gigabyte
+and ASUS product pages opened in headless Edge (Playwright) and the largest
+image whose address or alt text names the model; Dell from the media
+gallery address pattern
+`i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-enterprise-products/servers/poweredge/<model>/media-gallery/...psd?fmt=png-alpha&hei=600`
+(R260, R360 only; other models 404 and dell.com rate-limits to "Access
+Denied" after a few page loads); HPE DL20 from the 1worldsync product-image
+CDN; Dell R250 from Bing image search filtered to results whose title or
+address contains the model name. What did not work: Lenovo PSREF image
+links (they are logos), HPE and Fujitsu CDN guesses, DuckDuckGo, Bing in
+the Thai locale (returns posters), and reseller catalogue URLs guessed by
+hand. Lenovo SR250 V3, Fujitsu RX1330 M6 and the Tier 3 rows therefore use
+placeholder tiles.
+
+Lesson 16: deck-building helpers written only into the session scratchpad
+(`make_deck.py`, `add_hw_slide.py`, `export_slide.ps1`) were gone a day
+later, so the 8-slide deployment deck can no longer be regenerated. Any
+script that produces a deliverable goes into `scripts/` the same day.
