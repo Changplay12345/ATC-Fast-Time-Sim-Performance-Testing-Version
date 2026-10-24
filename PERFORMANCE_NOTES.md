@@ -995,3 +995,166 @@ before trusting a timing.
 `web/components/desktop/AboutDialog.tsx`, `web/components/MapApp.tsx`,
 `web/app/globals.css`, `tests/test_resources.py`, `scripts/resource_meter.py`
 (the standalone version; needs `psutil` in the venv), `results/` (ignored).
+
+---
+---
+
+# Part 6 — Where the time goes at 2,000 and 10,000 flights (analysis, 2026-10-24)
+
+The owner's target moved from 1,000 flights to 10,000 per run, with a wait
+of minutes being unacceptable. This part is the measured anatomy of one
+run, file → engine → browser, on the development PC (8 cores, 7 workers,
+RTX 4070, Edge, production `next build`), so the redesign can be aimed at
+the right parts. Nothing was changed yet.
+
+## 1. Results in one table
+
+| Stage | 1,990 flights (measured) | 9,950 flights (measured where marked, else scaled) | Where it runs |
+|---|---|---|---|
+| Read the CSV into plan tabs | 0.25 s to the "Imported" note, 0.5 s of long tasks, heap 90–140 MB | **0.8 s**, 2.4 s of long tasks, **heap 546 MB** (measured) | browser main thread |
+| Engine compute (7 workers) | 17.7 s = 8.9 ms/flight wall (≈ 62 ms CPU) | **74 s** = 7.5 ms/flight (measured) | engine worker processes |
+| Turn results into JSON on the server | ≈ 7 ms/flight = 14 s, GIL-bound | ≈ 70 s | engine parent process |
+| Bytes to the browser (decoded) | 266 MB JSON (146 KB/flight; 46 MB gzipped, 5.8×) | ≈ 1.45 GB JSON | network / browser parse |
+| "Generate all" wall time as the user sees it | **19.6–19.9 s** (50 chunks of 40, 3 in flight) | 2–2.5 min just for the transfer-and-parse pipeline | — |
+| Browser main thread during generation | 0.5 s of long tasks | ≈ 12 s (per-chunk re-render is O(n), 250 chunks) | browser |
+| After the last chunk: freeze before the map is usable | **5.9 s** of long tasks, longest 2.9 s | ≈ 75 s (pairwise scan alone, see §4) | browser main thread |
+| Browser heap with results loaded | **645–670 MB** (≈ 325 KB/flight, ≈ 500 B per point object) | ≈ 3.3 GB → not viable in one tab | browser |
+| Frame rate afterwards, idle | 180 fps | unknown (cannot load) | browser |
+| Engine memory while holding results | export cache 357 KB/flight (capped at 4,000 → 1.4 GB); payload dicts ≈ 640 KB/flight while in flight | 6.4 GB in the parent when all 9,915 payloads are held at once (measured in-process) | engine |
+
+So at 10,000 flights the engine's arithmetic is about 75 s, and everything
+around it (serialising, shipping, parsing and holding 6.5 million point
+objects, then scanning 50 million pairs) is several times that. The
+"5 minutes" is mostly the data format and the browser-side architecture,
+not the physics.
+
+## 2. The engine, per flight (cProfile, serial path, 200 real flights)
+
+145 ms/flight under the profiler (≈ 62 ms without it).
+
+| Share | What | Where |
+|---|---|---|
+| 73 % | `build_flight_timeline`: the along-track integration at a 1 s step in pure Python (`_build_tables` → `_speed_at` → `profile.at`, `target_tas_kt`), 1.06 M calls of `trajectory.py:39x` for 200 flights, 16.8 M `max()` calls | `trajectory_sim/trajectory.py` |
+| 10 % | one shapely `Point(lon, lat, z)` per sample and the per-sample `Geod.inv`/`fwd` in `_locate_along_route` | `trajectory_sim/output.py`, `trajectory.py:154` |
+| 6 % | building a pandas/GeoPandas DataFrame per flight, then `assign_waypoint_column` (O(fixes × samples)), then `_avg` (6 boolean-mask filters) and three `.tolist()` passes | `output.py:171`, `api/server.py:2703–2816` |
+| 6 % | the `points` list comprehension: `isoformat()`, `total_seconds()`, `pd.isna` and `float()` per point | `api/server.py:2703` |
+| rest | route parsing, procedure assembly (never cached: `lookup_procedure` rebuilds the `Procedure` each time), turn arcs (`Geod.fwd` per 5°) | `api/server.py`, `navdata.py` |
+
+Output cadence is 5 s plus one sample at every path vertex: mean 651 points
+per flight, max 1,548. Each point is a 9-key dict with an ISO timestamp
+string: **218 bytes of JSON per point** where six float32 values would be 24.
+
+Per batch, the parent then does on one thread, under the GIL:
+`jsonable_encoder` + `json.dumps` (≈ 7 ms/flight) and gzip level 5 (0.06 s
+per 40-flight chunk, cheap). Three chunks in flight do not help this part.
+Each result also crosses the process boundary twice: the point dicts and a
+pickled GeoDataFrame (43 KB) that the parent re-registers in `_EXPORT_CACHE`.
+
+## 3. The browser, per run
+
+- **Import is not the problem.** 10,000 rows parse in under a second. The
+  cost that scales is `previewRoutes` → `resolveRoutePreview`, which rebuilds
+  the fix and airway index per plan (O(plans × navdata)), and the
+  departure-conflict grouping with `[...arr, f]` per flight (O(k²) per
+  aerodrome). Together ≈ 2.4 s of long tasks and 546 MB of heap at 10k.
+- **Generation is network-bound and leaves the main thread idle**: 0.5 s of
+  long tasks over 20 s. The only per-chunk state update is the progress
+  text, which re-renders the whole GeneratorPanel and its plan tabs (O(n)
+  per chunk, no virtualisation).
+- **The freeze comes after the last chunk**, when `setResults` lands and
+  everything keyed on `trajectories` recomputes at once: per-flight route
+  layer build (nearest-sample search per waypoint), `FitBounds` over every
+  point, route cards for every flight (`nav: "all"`), the PDR check, the
+  airspace pass, and the strategic plan scan.
+- **Heap:** every point is a JS object `{lat, lon, epoch_ts, t_s, altitude_ft,
+  gs_kt, tas_kt, track_deg, phase}`, duplicated once more as `Sample`
+  objects by `toSamples`. ≈ 500 B per point, 325 KB per flight, 3.3 GB at 10k.
+
+## 4. Bug found: the plan-scan worker dies in production and the scan runs inline
+
+Console on the production build after every Generate all:
+
+    [plan-scan] worker failed, scanning inline: Uncaught ReferenceError: window is not defined
+
+`lib/backend.ts:53` reads `window.__APP_CONFIG__` at module scope behind a
+`typeof window !== "undefined"` guard. Next.js compiles client bundles with
+`typeof window` fixed to `"object"`, so the guard is folded away in the
+compiled worker chunk (`static/chunks/691.*.js` shows `l=window.__APP_CONFIG__`
+with no check). A web worker has no `window`, the module throws on load,
+`usePlanScan`'s `onerror` fallback runs `scanFlightPlanConflicts` on the
+main thread. That is the 2.9 s long task after a 2,000-flight run.
+
+Scan cost measured in isolation (vitest, synthetic straight-line flights,
+5 s samples, `DEFAULT_CDR_CONFIG`):
+
+| Flights | Pairs | Time | Per pair |
+|---|---|---|---|
+| 500 | 125 k | 0.16 s | 1.30 µs |
+| 1,000 | 500 k | 0.68 s | 1.35 µs |
+| 2,000 | 2.0 M | 2.9 s | 1.46 µs |
+| 4,000 | 8.0 M | 12.3 s | 1.53 µs |
+| 10,000 (scaled) | 50 M | ≈ 75 s | — |
+
+It is pure n²: every pair goes through `cannotMeet` with two allocated
+bounds objects; there is no time or space bucketing. In a working worker it
+would still take 75 s at 10k before conflicts appear; inline it freezes the
+tab for that long.
+
+## 5. What this means for a 10,000-flight design (directions, not decisions)
+
+1. **The point format is the first wall.** 218 B/point as JSON dicts and
+   500 B/point as JS objects cannot carry 6.5 M points. Packed columnar
+   arrays (Float32 lat/lon/alt/t, Int16 gs/track, Uint8 phase ≈ 20–24
+   B/point) cut the transfer ~9× and the browser heap ~20×, and the
+   server-side `jsonable_encoder` cost disappears with them. Fewer points
+   (adaptive cadence: 5 s in the TMA, 15–30 s in cruise) halves it again.
+2. **The engine's 75 s is pure Python arithmetic at a 1 s step**, with a
+   DataFrame and a shapely Point per sample built only to be thrown away
+   before the JSON. Vectorising `_build_tables` with numpy and deferring
+   the GeoDataFrame to download time is the 3–5× lever Part 2 §7 already
+   named; output must stay byte-identical (Part 2's `equiv.py` method).
+3. **The browser should not hold the whole result set as objects.** Typed-array
+   sample tables (one per flight or one global table with offsets) feed
+   deck.gl as binary attributes directly, make `aircraftAt` a binary search
+   over a Float32Array, and let the scan worker receive a transferable
+   buffer instead of a structured clone.
+4. **The pairwise scan needs bucketing** (time windows × coarse cells) to be
+   near-linear; and the worker crash (§4) must be fixed regardless.
+5. **Lists need virtualisation**: 10k plan tabs, 10k route cards, the filter
+   panel rows. Route cards must not re-render per frame (`simT` prop).
+6. **Alternatively keep the points on the server** and send the browser only
+   what the view needs (aircraft states for the current sim time, route
+   polylines once). That turns the browser into a viewer and makes the
+   server's memory the limit (cache cap, 357 KB/flight today). It is the
+   bigger architectural change but the one that scales past 10k.
+
+## 6. How it was measured (reusable)
+
+- Engine profile and throughput: `scripts/perf/prof_engine.py <csv> <n> serial|parallel`
+  (serial = cProfile per-flight breakdown written next to the script;
+  parallel = the real pool, wall time, memory, JSON size per flight).
+  Run it from the repo root with the venv Python; the pool needs the
+  `if __name__ == "__main__"` guard (spawned workers re-import the script).
+- Browser, production build: build with `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000 npm run build`,
+  start `uvicorn api.server:app --port 8000` with `WEB_ORIGIN=http://127.0.0.1:3000`
+  and `npm run start`; then `node scripts/perf/e2e_longtask.mjs <csv> http://127.0.0.1:3000 1 60`
+  (needs `playwright-core` and Edge). It reports import time, long tasks,
+  heap, chunk bytes, generate wall time, and fps/long tasks in 10 s slices
+  afterwards, plus console errors (which is how the worker crash surfaced).
+- Browser main-thread attribution: run `next dev` instead and
+  `node scripts/perf/e2e_profile.mjs <csv> http://127.0.0.1:3000 60`, which
+  records a CDP CPU profile for 60 s after generation and prints self and
+  inclusive time by function (readable names only in dev).
+- Scan scaling: a throwaway vitest file calling `scanFlightPlanConflicts`
+  on synthetic `PlanFlight`s at 500–4,000 (text in this part's table).
+- Test file for 10k: `dummy_data/10k_flights_synthetic.csv` = the 1,990-flight
+  day five times with callsign suffixes and 7-minute offsets (9,950 rows).
+
+Gotchas: B26 a Playwright headed window that is occluded throttles
+`requestAnimationFrame` to 1 Hz, which made a frame-gap "settle" meter
+report 120 s of "busy"; measure main-thread cost with the Long Tasks API
+and call `page.bringToFront()`. B27 `request().timing()` start times are
+not on the same clock as `responseStart`; use `Date.now()` around the
+request instead. B28 writing cProfile output with a relative path lands it
+in the repo root when the script `chdir`s there.
+
