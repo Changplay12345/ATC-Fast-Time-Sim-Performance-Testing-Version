@@ -117,6 +117,7 @@ def rule(slide, x, y, w, color=RULE, weight=0.75):
     ln = slide.shapes.add_connector(1, Inches(x), Inches(y), Inches(x + w), Inches(y))
     ln.line.color.rgb = color
     ln.line.width = Pt(weight)
+    ln.shadow.inherit = False
 
 
 def placeholder(slide, x, y, w, h, label):
@@ -124,6 +125,7 @@ def placeholder(slide, x, y, w, h, label):
     box.adjustments[0] = 0.08
     box.fill.solid(); box.fill.fore_color.rgb = TINT
     box.line.color.rgb = RULE; box.line.width = Pt(0.75)
+    box.shadow.inherit = False
     tf = box.text_frame
     tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER

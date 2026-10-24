@@ -1166,6 +1166,7 @@ documents, so the complete version can reuse them instead of re-deriving.
 | `Cloud_Hosting_Proposal.pdf` | 2-page A4, white clean, plain language for the owner's boss: Railway Pro, Singapore, 15 months | `scripts/decks/proposals/cloud_proposal.html` printed with `scripts/decks/make_pdf.mjs` (Playwright `page.pdf`, Edge `channel: "msedge"`, A4, `preferCSSPageSize`) |
 | `Colocation_Proposal.pdf` | 2-page A4, same style as the cloud one: buy one 1U server, host it in a Bangkok data centre; budget ฿170,000 / expected ≈ ฿125,000 for 15 months (server ≈ ฿95k + hosting ฿2,000/mo × 15, setup free, as quoted to the owner 2026-10-24), then ฿2,000/mo; model chosen later from the 1U deck | `scripts/decks/proposals/colocation_proposal.html` → `node scripts/decks/make_pdf.mjs <html> <pdf> <preview.png>` (needs `npm i playwright-core@1` and Edge) |
 | `Software_First_Note.html` + artifact | one-page answer to the boss's "finish the software before the server?" (yes; keep the server decision cheap until real usage is measured) | `scripts/decks/proposals/software_first_page.html`, published as a claude.ai artifact |
+| `FTS_Focus_Next.pptx` | one slide, same white style: "finish the software first, keep the server decision cheap"; three columns (why, measured facts, how to keep it cheap), a 4-step order, the trade-off | `scripts/decks/make_focus_slide.py` + `export_slides.ps1` |
 | `FTS_1U_Servers.pptx` | 2 slides, white clean: every 1U server considered for colocation, with same-size product photos, CPU, 1,000-flight time for 1 / 3 users, est. price incl. VAT, notes | `scripts/decks/make_1u_slides.py` (in the repo now) + `scripts/decks/export_slides.ps1` to check as PNG |
 
 ### Planning numbers (all in `PERFORMANCE_NOTES.md` Part 5 and the proposal)
@@ -1215,7 +1216,7 @@ documents, so the complete version can reuse them instead of re-deriving.
 3. `powershell -File scripts/decks/export_slides.ps1 -Deck <pptx> -OutDir <dir>`
    exports `slide1.png`, `slide2.png` through PowerPoint COM; look at them
    before sending (two overlaps were only visible this way).
-4. Style that was accepted: white background, Arial, dark #1F2937 text,
+4. Style that was accepted (python-pptx shapes and connectors carry the theme shadow by default; set `shape.shadow.inherit = False` on every box and rule): white background, Arial, dark #1F2937 text,
    muted #6B7280, accent #0B7285 for tier headings and times, 0.75 pt
    #D1D5DB rules. Write prices as "THB 95,000 - 115,000": the baht glyph
    renders tiny in Arial on slides.
