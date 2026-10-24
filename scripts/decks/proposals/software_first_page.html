@@ -1,0 +1,79 @@
+<title>Software First</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: one narrow reading column, white paper, teal rules; same look as the cloud proposal page */
+  :root {
+    --bg: #ffffff;
+    --fg: #1f2937;
+    --muted: #6b7280;
+    --accent: #0b7285;
+    --rule: #d1d5db;
+    --tint: #f3f6f9;
+    --font: Arial, Helvetica, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #111518; --fg: #e5e7eb; --muted: #9ca3af; --accent: #4fb3c6; --rule: #2f3a42; --tint: #1a2026; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #111518; --fg: #e5e7eb; --muted: #9ca3af; --accent: #4fb3c6; --rule: #2f3a42; --tint: #1a2026; color-scheme: dark; }
+
+  body { background: var(--bg); color: var(--fg); font-family: var(--font); line-height: 1.55; font-size: 16px;
+         padding-block: 40px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  main { max-width: 760px; margin: 0 auto; }
+  .eyebrow { color: var(--muted); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 10px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; text-wrap: balance; }
+  .answer { font-size: 19px; color: var(--accent); font-weight: bold; margin: 0 0 28px; text-wrap: balance; }
+  h2 { font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); margin: 32px 0 10px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  p { margin: 0 0 12px; max-width: 65ch; }
+  ul, ol { margin: 0 0 12px; padding-left: 22px; }
+  li { margin: 0 0 8px; max-width: 65ch; }
+  li b { color: var(--fg); }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0 0 8px; }
+  .fact { background: var(--tint); padding: 14px 16px; min-width: 0; }
+  .fact .n { font-size: 26px; font-weight: bold; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .fact .l { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  ol.steps li { padding-left: 4px; }
+  .tradeoff { background: var(--tint); padding: 14px 16px; margin-top: 8px; }
+  .tradeoff p { margin: 0; }
+  @media (max-width: 560px) { .facts { grid-template-columns: 1fr; } h1 { font-size: 26px; } }
+</style>
+
+<main>
+  <p class="eyebrow">ATC Fast-Time Simulation Tool · October 2026</p>
+  <h1>Should we finish the software before choosing a server?</h1>
+  <p class="answer">Yes. Finish the software first and keep the server decision cheap and open until real users have run it.</p>
+
+  <h2>Why software first</h2>
+  <ul>
+    <li><b>The right server depends on how much the tool gets used,</b> and nobody knows that yet. Today's load numbers come from tests, not from real users. The finished app has a built-in load meter so we can read the real figure later.</li>
+    <li><b>The simulation is cheap to run.</b> A 1,000-flight run takes about 10 seconds on an ordinary 8-core PC and under 2 GB of memory. Nothing about that forces a hardware purchase now.</li>
+    <li><b>The full version will change the numbers.</b> Every feature added changes how much computing each run needs, so any sizing done today would be redone anyway.</li>
+    <li><b>Users judge the software, not the server.</b> Features and correctness are what the testers see.</li>
+  </ul>
+
+  <h2>What we measured</h2>
+  <div class="facts">
+    <div class="fact"><div class="n">10 s</div><div class="l">one 1,000-flight run, one user, 8-core PC</div></div>
+    <div class="fact"><div class="n">&lt; 2 GB</div><div class="l">memory for the whole simulation engine</div></div>
+    <div class="fact"><div class="n">THB 720 / mo</div><div class="l">expected cloud cost at the planned load</div></div>
+  </div>
+
+  <h2>Keeping the server decision cheap</h2>
+  <ul>
+    <li><b>The desktop app needs no server.</b> Testers keep using it whatever we decide later.</li>
+    <li><b>Several people on one PC already works</b> over the office network, at no cost.</li>
+    <li><b>If a remote demo is wanted early,</b> the cloud option costs about THB 720 a month, starts in an afternoon, and can be cancelled. It is a trial, not a commitment.</li>
+    <li><b>No hardware purchase yet.</b> The server shortlist is ready for when real usage says a dedicated machine is worth it. Prices do not rise by waiting.</li>
+  </ul>
+
+  <h2>Suggested order</h2>
+  <ol class="steps">
+    <li><b>Build the complete version</b> using everything learned from the test version.</li>
+    <li><b>Put it in front of the real users</b> on desktop, plus the cheap cloud trial if a remote demo is wanted.</li>
+    <li><b>After about a month of real use,</b> read the load meter and the cloud bill.</li>
+    <li><b>Then choose</b> cloud, rented rack space, or an office server, with evidence. The proposals for each option will be ready for that meeting.</li>
+  </ol>
+
+  <div class="tradeoff">
+    <p><b>The trade-off:</b> the server question stays open for a few months. In return, when it is answered, it is answered with real usage data and the smallest possible spend.</p>
+  </div>
+</main>

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cloud Hosting Proposal</title>
+<style>
+  @page { size: A4; margin: 18mm 18mm 16mm 18mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #ffffff; color: #1a1a1a; }
+  body { font: 400 10.5pt/1.5 "Segoe UI", Arial, Helvetica, sans-serif; }
+  h1 { font-size: 22pt; font-weight: 700; line-height: 1.2; margin: 0 0 4pt; letter-spacing: -0.01em; }
+  h2 { font-size: 12.5pt; font-weight: 700; margin: 0 0 6pt; padding-bottom: 3pt; border-bottom: 1.5pt solid #1a1a1a; }
+  p { margin: 0; }
+  ul { margin: 0; padding-left: 14pt; }
+  li { margin: 0 0 3pt; }
+  .eyebrow { font-size: 9pt; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #555; margin-bottom: 6pt; }
+  .meta { display: flex; gap: 28pt; font-size: 9.5pt; color: #444; margin: 8pt 0 0; }
+  .meta b { color: #1a1a1a; }
+  .rule { border: 0; border-top: 1pt solid #cfcfcf; margin: 14pt 0; }
+  section { margin: 0 0 15pt; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24pt; }
+  .figures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10pt; margin: 8pt 0 2pt; }
+  .fig { border: 1pt solid #d9d9d9; border-radius: 4pt; padding: 9pt 11pt; }
+  .fig .k { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.08em; color: #555; }
+  .fig .v { font-size: 20pt; font-weight: 700; line-height: 1.2; margin: 2pt 0; font-variant-numeric: tabular-nums; }
+  .fig .s { font-size: 8.5pt; color: #555; }
+  .fig.main { border-color: #1a1a1a; border-width: 1.5pt; }
+  table { border-collapse: collapse; width: 100%; font-size: 9.8pt; margin-top: 4pt; }
+  th, td { text-align: left; vertical-align: top; padding: 5pt 8pt; border-bottom: 1pt solid #e2e2e2; }
+  thead th { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.06em; color: #555; border-bottom: 1pt solid #1a1a1a; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  th.num { text-align: right; }
+  tr.total td { font-weight: 700; border-bottom: none; border-top: 1.5pt solid #1a1a1a; }
+  .decision { border: 1.5pt solid #1a1a1a; border-radius: 4pt; padding: 10pt 12pt; margin-top: 4pt; }
+  .sign { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20pt; margin-top: 22pt; }
+  .sign div { border-top: 1pt solid #1a1a1a; padding-top: 4pt; font-size: 8.5pt; color: #555; }
+  .small { font-size: 8.8pt; color: #555; }
+  section, table, .fig, .decision { break-inside: avoid; }
+  .page2 { break-before: page; }
+  .foot { position: fixed; bottom: 0; right: 0; font-size: 8pt; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="eyebrow">Proposal · ATC Fast-Time Simulation Tool</div>
+<h1>Running the simulation tool on a cloud server</h1>
+<p>A plan to host the tool on a rented server in Singapore for 15 months, so staff use it from a web browser with nothing to install.</p>
+<div class="meta">
+  <span><b>From:</b> BearCat AEL Co, engineering</span>
+  <span><b>Date:</b> 22 October 2026</span>
+  <span><b>Period:</b> 15 months</span>
+</div>
+
+<hr class="rule">
+
+<section>
+  <h2>What we propose</h2>
+  <p>Today the tool runs as a program installed on each person's computer. We propose to also run it on a rented server (Railway, Singapore). Users open a web address, load a traffic file, and the server does the calculation. Nothing is installed on their computers and everyone always has the latest version. The same software already runs this way on a free test server; this proposal moves it to a paid server that is fast and reliable enough for real use.</p>
+</section>
+
+<section>
+  <h2>What it costs</h2>
+  <div class="figures">
+    <div class="fig main"><div class="k">Budget requested</div><div class="v">฿35,000</div><div class="s">for 15 months, covering the busiest case</div></div>
+    <div class="fig"><div class="k">Expected spend</div><div class="v">฿11,000</div><div class="s">for 15 months, at the use we plan for</div></div>
+    <div class="fig"><div class="k">Expected per month</div><div class="v">≈ ฿720</div><div class="s">about US$21</div></div>
+  </div>
+  <p class="small" style="margin-top:6pt">The provider charges a fixed US$20 a month plus a small amount for actual use, like an electricity bill. At the use we expect, most months cost the minimum. The budget covers the busiest plausible month every month, plus a margin for the exchange rate (฿34 per US dollar used here).</p>
+  <table>
+    <thead><tr><th>Scenario</th><th>Per month</th><th class="num">15 months</th></tr></thead>
+    <tbody>
+      <tr><td>Expected use: 2–4 people a day, about 10 runs each, 1,000 flights per run</td><td>≈ US$21</td><td class="num">≈ ฿11,000</td></tr>
+      <tr><td>Heavy use: 10 people a day, 20 runs each</td><td>≈ US$44</td><td class="num">≈ ฿22,500</td></tr>
+      <tr><td>Heavy use before the engine is tuned (see below)</td><td>≈ US$64</td><td class="num">≈ ฿32,600</td></tr>
+      <tr class="total"><td colspan="2">Budget requested</td><td class="num">฿35,000</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="two page2">
+  <section>
+    <h2>Who would use it</h2>
+    <ul>
+      <li>Up to 10 staff in total; 2–4 on a typical day.</li>
+      <li>About 10 simulation runs per person per day, 1,000 flights each.</li>
+      <li>A 1,000-flight run takes about 50 seconds; 2,000 flights about 1.7 minutes.</li>
+      <li>If two people run at the same moment, each waits about twice as long. Sized for up to 10 people and 20 runs each.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Why this option</h2>
+    <ul>
+      <li>Nothing to install; works on any computer with a browser.</li>
+      <li>Everyone is on the latest version automatically.</li>
+      <li>Easy to demonstrate to people outside the office.</li>
+      <li>The installed desktop version stays available and costs nothing to run, including offline.</li>
+    </ul>
+  </section>
+</div>
+
+<div class="two">
+  <section>
+    <h2>Before it goes live</h2>
+    <p>About <b>five working days</b> of our own engineering time, in three weeks:</p>
+    <ul>
+      <li>Set up the server in Singapore and measure a real run.</li>
+      <li>Tune the engine so it uses less memory when idle (this is what keeps the monthly cost near the minimum).</li>
+      <li>Add a password so only our staff can use it.</li>
+      <li>Register a web address.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Things to be aware of</h2>
+    <ul>
+      <li>Traffic files are processed on a server outside the office, in Singapore. Fine for simulation and demonstration data; to be reviewed before confidential data is used.</li>
+      <li>It needs an internet connection. The desktop version covers offline work.</li>
+      <li>The provider's prices may change; the bill will be checked monthly.</li>
+      <li>No formal uptime guarantee at this price level.</li>
+    </ul>
+  </section>
+</div>
+
+<section>
+  <h2>Decision requested</h2>
+  <div class="decision">
+    <p>Approval of a budget of <b>฿35,000</b> for 15 months of cloud hosting (expected spend about ฿11,000), and about five days of engineering time to set it up.</p>
+  </div>
+  <div class="sign">
+    <div>Prepared by</div>
+    <div>Reviewed by</div>
+    <div>Approved by / date</div>
+  </div>
+</section>
+
+<div class="foot">BearCat AEL Co · Cloud hosting proposal · 22 October 2026</div>
+</body>
+</html>

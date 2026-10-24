@@ -1163,7 +1163,9 @@ documents, so the complete version can reuse them instead of re-deriving.
 | File | What | How it was made |
 |---|---|---|
 | `FTS_Deployment_Options.pptx` | 8 slides: the three deployment methods; slide 8 = local server hardware comparison (incl. the owner's 9800X3D PC, upload time, FPS, 3–4 users) | python-pptx; the helper lived in the session scratchpad and is gone (lesson below) |
-| `Cloud_Hosting_Proposal.pdf` | 2-page A4, white clean, plain language for the owner's boss: Railway Pro, Singapore, 15 months | HTML page printed with Playwright `page.pdf` (Edge, `channel: "msedge"`) |
+| `Cloud_Hosting_Proposal.pdf` | 2-page A4, white clean, plain language for the owner's boss: Railway Pro, Singapore, 15 months | `scripts/decks/proposals/cloud_proposal.html` printed with `scripts/decks/make_pdf.mjs` (Playwright `page.pdf`, Edge `channel: "msedge"`, A4, `preferCSSPageSize`) |
+| `Colocation_Proposal.pdf` | 2-page A4, same style as the cloud one: buy one 1U server, host it in a Bangkok data centre; budget ฿180,000 / expected ≈ ฿150,000 for 15 months (server ≈ ฿95k + hosting ฿3,500/mo × 15 + setup), then ≈ ฿3,500/mo; model chosen later from the 1U deck | `scripts/decks/proposals/colocation_proposal.html` → `node scripts/decks/make_pdf.mjs <html> <pdf> <preview.png>` (needs `npm i playwright-core@1` and Edge) |
+| `Software_First_Note.html` + artifact | one-page answer to the boss's "finish the software before the server?" (yes; keep the server decision cheap until real usage is measured) | `scripts/decks/proposals/software_first_page.html`, published as a claude.ai artifact |
 | `FTS_1U_Servers.pptx` | 2 slides, white clean: every 1U server considered for colocation, with same-size product photos, CPU, 1,000-flight time for 1 / 3 users, est. price incl. VAT, notes | `scripts/decks/make_1u_slides.py` (in the repo now) + `scripts/decks/export_slides.ps1` to check as PNG |
 
 ### Planning numbers (all in `PERFORMANCE_NOTES.md` Part 5 and the proposal)
@@ -1236,3 +1238,8 @@ Lesson 16: deck-building helpers written only into the session scratchpad
 (`make_deck.py`, `add_hw_slide.py`, `export_slide.ps1`) were gone a day
 later, so the 8-slide deployment deck can no longer be regenerated. Any
 script that produces a deliverable goes into `scripts/` the same day.
+
+Proposal sources now live in `scripts/decks/proposals/`; to re-issue one,
+edit the HTML (dates, figures), run `make_pdf.mjs`, and look at the PNG
+preview it writes (the tool prints the printed height in A4 pages; keep it
+under 2.0). Still owed: the desktop-only proposal in the same style.

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Colocation Proposal</title>
+<style>
+  @page { size: A4; margin: 18mm 18mm 16mm 18mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #ffffff; color: #1a1a1a; }
+  body { font: 400 10.5pt/1.5 "Segoe UI", Arial, Helvetica, sans-serif; }
+  h1 { font-size: 22pt; font-weight: 700; line-height: 1.2; margin: 0 0 4pt; letter-spacing: -0.01em; }
+  h2 { font-size: 12.5pt; font-weight: 700; margin: 0 0 6pt; padding-bottom: 3pt; border-bottom: 1.5pt solid #1a1a1a; }
+  p { margin: 0; }
+  ul { margin: 0; padding-left: 14pt; }
+  li { margin: 0 0 3pt; }
+  .eyebrow { font-size: 9pt; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #555; margin-bottom: 6pt; }
+  .meta { display: flex; gap: 28pt; font-size: 9.5pt; color: #444; margin: 8pt 0 0; }
+  .meta b { color: #1a1a1a; }
+  .rule { border: 0; border-top: 1pt solid #cfcfcf; margin: 14pt 0; }
+  section { margin: 0 0 15pt; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24pt; }
+  .figures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10pt; margin: 8pt 0 2pt; }
+  .fig { border: 1pt solid #d9d9d9; border-radius: 4pt; padding: 9pt 11pt; }
+  .fig .k { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.08em; color: #555; }
+  .fig .v { font-size: 20pt; font-weight: 700; line-height: 1.2; margin: 2pt 0; font-variant-numeric: tabular-nums; }
+  .fig .s { font-size: 8.5pt; color: #555; }
+  .fig.main { border-color: #1a1a1a; border-width: 1.5pt; }
+  table { border-collapse: collapse; width: 100%; font-size: 9.8pt; margin-top: 4pt; }
+  th, td { text-align: left; vertical-align: top; padding: 5pt 8pt; border-bottom: 1pt solid #e2e2e2; }
+  thead th { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.06em; color: #555; border-bottom: 1pt solid #1a1a1a; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  th.num { text-align: right; }
+  tr.total td { font-weight: 700; border-bottom: none; border-top: 1.5pt solid #1a1a1a; }
+  .decision { border: 1.5pt solid #1a1a1a; border-radius: 4pt; padding: 10pt 12pt; margin-top: 4pt; }
+  .sign { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20pt; margin-top: 22pt; }
+  .sign div { border-top: 1pt solid #1a1a1a; padding-top: 4pt; font-size: 8.5pt; color: #555; }
+  .small { font-size: 8.8pt; color: #555; }
+  section, table, .fig, .decision { break-inside: avoid; }
+  .page2 { break-before: page; }
+  .foot { position: fixed; bottom: 0; right: 0; font-size: 8pt; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="eyebrow">Proposal · ATC Fast-Time Simulation Tool</div>
+<h1>Running the simulation tool on our own server, housed in a data centre</h1>
+<p>A plan to buy one server, place it in a professional data centre in Bangkok, and pay a fixed monthly fee for the space, power and internet. The company owns the machine; the data centre looks after the room.</p>
+<div class="meta">
+  <span><b>From:</b> BearCat AEL Co, engineering</span>
+  <span><b>Date:</b> 24 October 2026</span>
+  <span><b>Period:</b> 15 months</span>
+</div>
+
+<hr class="rule">
+
+<section>
+  <h2>What we propose</h2>
+  <p>Instead of renting computing by the month (the cloud proposal), we buy one small rack-mount server and have a Thai data centre host it. This is called colocation. The data centre provides a locked rack, power with battery and generator backup, cooling and a fast internet line, and its staff can restart the machine or swap a part for us, so nobody has to travel there. Users work exactly as in the cloud option: they open a web address and the server does the calculation. The exact server model is chosen later from the hardware catalogue already prepared; this proposal fixes the budget, not the model.</p>
+</section>
+
+<section>
+  <h2>What it costs</h2>
+  <div class="figures">
+    <div class="fig main"><div class="k">Budget requested</div><div class="v">฿180,000</div><div class="s">for 15 months, server included</div></div>
+    <div class="fig"><div class="k">Expected spend</div><div class="v">≈ ฿150,000</div><div class="s">for 15 months, mid-range server</div></div>
+    <div class="fig"><div class="k">After month 15</div><div class="v">≈ ฿3,500 / mo</div><div class="s">the server is ours; only the hosting fee continues</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Item</th><th>Basis</th><th class="num">15 months</th></tr></thead>
+    <tbody>
+      <tr><td>Server (one-time purchase, from the hardware catalogue)</td><td>฿85,000 – 130,000 depending on brand and support level</td><td class="num">≈ ฿95,000</td></tr>
+      <tr><td>Data-centre hosting: rack space, power, cooling, internet</td><td>฿2,000 – 4,000 per month (NIPA Cloud, KIRZ, ReadyIDC, P&amp;T quoted ranges)</td><td class="num">≈ ฿52,500</td></tr>
+      <tr><td>Installation and setup fee (one-time)</td><td>provider's standard charge</td><td class="num">≈ ฿3,000</td></tr>
+      <tr><td>Spare parts reserve (a drive or power supply)</td><td>held, spent only if needed</td><td class="num">฿5,000 – 10,000</td></tr>
+      <tr class="total"><td colspan="2">Budget requested (covers a brand-name server with on-site warranty)</td><td class="num">฿180,000</td></tr>
+    </tbody>
+  </table>
+  <p class="small" style="margin-top:6pt">Hosting prices are from Thai providers' published rates for one rack unit (1U) with standard power and a domestic 1 Gbps line, October 2026. Server prices are estimates from the catalogue; the only quoted figure so far is a basic Dell R260 at ฿62,800 + VAT. Final numbers come with the supplier quotes.</p>
+</section>
+
+<div class="two page2">
+  <section>
+    <h2>How it compares with the cloud option</h2>
+    <ul>
+      <li>Cloud, 15 months: about <b>฿11,000</b> expected, ฿35,000 budget. Colocation: about <b>฿150,000</b>, ฿180,000 budget.</li>
+      <li>Colocation costs more because we buy the machine up front. From month 16 the running cost is about ฿3,500 a month, with no charge per simulation run.</li>
+      <li>At today's expected use (2–4 people a day) the cloud is the cheaper choice. Colocation starts to pay back if the tool is used heavily every day for several years, or if the hardware is wanted for other work as well.</li>
+      <li>Both options give users the same web page; switching between them later is a one-day job.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Why choose this option</h2>
+    <ul>
+      <li>The data stays in Thailand, on a machine we own.</li>
+      <li>Unlimited simulation runs at a fixed monthly fee; no bill that grows with use.</li>
+      <li>A dedicated machine is faster for everyone than a shared cloud instance of the same price.</li>
+      <li>No office space, cooling or power backup needed on our side.</li>
+    </ul>
+  </section>
+</div>
+
+<div class="two">
+  <section>
+    <h2>Before it goes live</h2>
+    <p>About <b>six to eight weeks</b> from approval, mostly waiting for delivery:</p>
+    <ul>
+      <li>Choose the server from the catalogue and get two supplier quotes.</li>
+      <li>Sign a hosting contract (monthly or yearly; yearly is usually cheaper).</li>
+      <li>Deliver the server to the data centre; the provider installs it.</li>
+      <li>About five days of our engineering time to install the software, add a password and a web address, and measure a real run.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Things to be aware of</h2>
+    <ul>
+      <li>One machine, no spare: if it fails, the tool is down until the part is replaced (one to three days with on-site warranty). The desktop version covers the gap.</li>
+      <li>The purchase cannot be undone; the cloud option can be cancelled any month.</li>
+      <li>A server is normally replaced after about five years.</li>
+      <li>Hosting contracts often require one to three months' notice to end.</li>
+    </ul>
+  </section>
+</div>
+
+<section>
+  <h2>Decision requested</h2>
+  <div class="decision">
+    <p>Approval in principle of a budget of <b>฿180,000</b> for 15 months (expected about ฿150,000), with the server model to be confirmed from supplier quotes before purchase. Recommended only if the company wants to own the hardware; otherwise the cloud proposal is the lower-cost route for the same result.</p>
+  </div>
+  <div class="sign">
+    <div>Prepared by</div>
+    <div>Reviewed by</div>
+    <div>Approved by / date</div>
+  </div>
+</section>
+
+<div class="foot">BearCat AEL Co · Colocation proposal · 24 October 2026</div>
+</body>
+</html>
