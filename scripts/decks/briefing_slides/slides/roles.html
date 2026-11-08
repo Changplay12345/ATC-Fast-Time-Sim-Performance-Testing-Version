@@ -1,26 +1,31 @@
-<section id="roles" data-transition="fade" style="background:#FBFBF9;color:#1F2937;font-family:Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
-<h2 style="font-size:64px;font-weight:bold;line-height:1.1">Three roles, one team</h2>
-<div style="display:flex;gap:40px;align-items:stretch">
-<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#F3F6F9;padding:44px;border-radius:16px">
-<x-icon name="Users" style="width:64px;height:64px;color:#0B7285"></x-icon>
-<p style="font-size:24px;color:#0B7285;font-weight:bold;text-transform:uppercase;letter-spacing:1px">Our engineer</p>
-<h3 style="font-size:40px;font-weight:bold;line-height:1.2">Architect and inspector</h3>
-<p style="font-size:28px;line-height:1.4;color:#4A5568">Decides what comes next, checks every change, presses the release button.</p>
+<section id="roles" data-transition="fade" style="background:#FBFBF9;color:#1F2937;font-family:Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-size:64px;font-weight:bold;line-height:1.1">Who does what</h2>
+<div style="display:flex;gap:0;align-items:center">
+<div style="width:316px;display:flex;flex-direction:column;gap:16px;background:#F3F6F9;padding:36px;border-radius:16px">
+<x-icon name="Users" style="width:56px;height:56px;color:#0B7285"></x-icon>
+<h3 style="font-size:36px;font-weight:bold;line-height:1.2">Engineer</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Decides what to build. Checks every change. Presses release.</p>
 </div>
-<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#F3F6F9;padding:44px;border-radius:16px">
-<x-icon name="Wrench" style="width:64px;height:64px;color:#0B7285"></x-icon>
-<p style="font-size:24px;color:#0B7285;font-weight:bold;text-transform:uppercase;letter-spacing:1px">Claude</p>
-<h3 style="font-size:40px;font-weight:bold;line-height:1.2">The builder</h3>
-<p style="font-size:28px;line-height:1.4;color:#4A5568">Writes and tests the code on the engineer’s PC, measures speed, writes the notes.</p>
+<div style="width:133px;display:flex;flex-direction:column;align-items:center;gap:8px"><p style="font-size:24px;color:#0B7285;font-weight:bold;text-align:center;width:133px">instructions</p><x-shape kind="arrow-right" style="width:96px;height:40px;background:#0B7285"></x-shape></div>
+<div style="width:316px;display:flex;flex-direction:column;gap:16px;background:#F3F6F9;padding:36px;border-radius:16px">
+<x-icon name="Wrench" style="width:56px;height:56px;color:#0B7285"></x-icon>
+<h3 style="font-size:36px;font-weight:bold;line-height:1.2">Claude</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Writes the code. Runs the tests. Writes the notes.</p>
 </div>
-<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#F3F6F9;padding:44px;border-radius:16px">
-<x-icon name="Cloud" style="width:64px;height:64px;color:#0B7285"></x-icon>
-<p style="font-size:24px;color:#0B7285;font-weight:bold;text-transform:uppercase;letter-spacing:1px">GitHub</p>
-<h3 style="font-size:40px;font-weight:bold;line-height:1.2">Warehouse and delivery van</h3>
-<p style="font-size:28px;line-height:1.4;color:#4A5568">Keeps every version, builds the installers, hands updates to every user.</p>
+<div style="width:133px;display:flex;flex-direction:column;align-items:center;gap:8px"><p style="font-size:24px;color:#0B7285;font-weight:bold;text-align:center;width:133px">checked change</p><x-shape kind="arrow-right" style="width:96px;height:40px;background:#0B7285"></x-shape></div>
+<div style="width:316px;display:flex;flex-direction:column;gap:16px;background:#F3F6F9;padding:36px;border-radius:16px">
+<x-icon name="Cloud" style="width:56px;height:56px;color:#0B7285"></x-icon>
+<h3 style="font-size:36px;font-weight:bold;line-height:1.2">GitHub</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Keeps every version. Tests and builds. Sends updates.</p>
+</div>
+<div style="width:133px;display:flex;flex-direction:column;align-items:center;gap:8px"><p style="font-size:24px;color:#0B7285;font-weight:bold;text-align:center;width:133px">automatic update</p><x-shape kind="arrow-right" style="width:96px;height:40px;background:#0B7285"></x-shape></div>
+<div style="width:316px;display:flex;flex-direction:column;gap:16px;background:#0B7285;padding:36px;border-radius:16px">
+<x-icon name="Play" style="width:56px;height:56px;color:#F3F6F9"></x-icon>
+<h3 style="font-size:36px;font-weight:bold;line-height:1.2;color:#F3F6F9">Users</h3>
+<p style="font-size:26px;line-height:1.4;color:#DCEFF2">Open the app. The new version is already there.</p>
 </div>
 </div>
-<p style="font-size:28px;line-height:1.4;color:#4A5568">Nothing Claude writes reaches a user without the engineer reviewing it.</p>
+<p style="font-size:28px;line-height:1.4;color:#4A5568;text-align:center">Nothing reaches a user without the engineer checking it first.</p>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Claude and GitHub on the Simulation Tool · 3</p>
 <aside>Think of a building project: one person decides and inspects, one builds, one stores the materials and delivers the result.</aside>
 </section>

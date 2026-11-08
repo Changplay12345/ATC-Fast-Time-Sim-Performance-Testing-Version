@@ -1,15 +1,20 @@
 <section id="releases" data-transition="fade" style="background:#FBFBF9;color:#1F2937;font-family:Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
 <h2 style="font-size:64px;font-weight:bold;line-height:1.1">Releases, as the user’s app sees them</h2>
 <div style="display:flex;gap:48px;align-items:start">
-<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<div style="width:808px;display:flex;flex-direction:column;gap:20px">
 <img src="/_blob/217965178e5f009811f6b24a6d7a7f21" alt="The releases page on GitHub: version 0.4.4 marked Latest, with its release note and a list of earlier versions" style="width:808px;height:527px;object-fit:contain;border:1px solid #D1D5DB;border-radius:8px;background:#F3F6F9">
-<p style="font-size:27px;line-height:1.4;color:#4A5568">Eleven releases in the list. The note under each is the same text users see inside the app.</p>
+<p style="font-size:27px;line-height:1.4;color:#4A5568">Eleven releases. The note under each is what users see inside the app.</p>
 </div>
-<div style="flex:1;display:flex;flex-direction:column;gap:20px">
-<img src="/_blob/5e1187e8ea944482f8e46d01e898fa43" alt="Release 0.4.4 with the Windows installer, the Mac version and the small signature files" style="width:808px;height:527px;object-fit:contain;border:1px solid #D1D5DB;border-radius:8px;background:#F3F6F9">
-<p style="font-size:27px;line-height:1.4;color:#4A5568">Inside one release: the Windows installer, the Mac version, and the small <b>signature files</b> the app checks before installing anything.</p>
+<div style="width:808px;display:flex;flex-direction:column;gap:20px">
+<img src="/_blob/5e1187e8ea944482f8e46d01e898fa43" alt="Release 0.4.4 with the Windows installer, the Mac version and the small signature files" style="width:808px;height:436px;object-fit:contain;border:1px solid #D1D5DB;border-radius:8px;background:#F3F6F9">
+<div style="display:flex;gap:24px;align-items:center">
+<p style="font-size:27px;line-height:1.4;background:#0B7285;color:#F3F6F9;padding:16px 24px;border-radius:12px;width:420px"><b>Signature files:</b> proof the update came from us</p>
+<p style="font-size:27px;line-height:1.4;color:#4A5568;width:364px">Installer for Windows, app for Mac, and a signature for each.</p>
 </div>
 </div>
+</div>
+<x-connector x1="1150" y1="700" x2="1120" y2="568" head="end" head-end="filled" route="straight" style="color:#0B7285;border-width:4px"></x-connector>
+<x-connector x1="1180" y1="700" x2="1100" y2="655" head="end" head-end="filled" route="straight" style="color:#0B7285;border-width:4px"></x-connector>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Claude and GitHub on the Simulation Tool · 14</p>
-<aside>The signature proves the update came from us. The key that makes it never leaves the engineer’s PC.</aside>
+<aside>The app refuses any update whose signature does not match. The key that makes the signature never leaves the engineer’s PC.</aside>
 </section>

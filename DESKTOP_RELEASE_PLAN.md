@@ -1234,7 +1234,14 @@ documents, so the complete version can reuse them instead of re-deriving.
 3. Style = the same as the pptx decks: Arial, ink #1F2937, muted #6B7280,
    accent #0B7285, rule #D1D5DB, tint #F3F6F9, toned white #FBFBF9 as the
    page; one accent-coloured statement slide; footer pinned at the bottom
-   with the deck name and slide number.
+   with the deck name and slide number. Third pass (2026-11-09, "less
+   wording, more arrows"): the roles slide is a chain Engineer -> Claude ->
+   GitHub -> Users with labelled arrows; screenshots carry callout arrows
+   (`x-connector` in canvas coordinates: picture top-left is at (128, 238)
+   on a slide with a 64 px heading and 40 px gap; multiply the pixel
+   position inside the cropped screenshot by displayed width / crop width);
+   the release run is a Test -> Build Windows / Mac -> Publish strip with
+   the real durations; table cells and answers are one short line each.
 4. The artifact is private until shared from its Share menu; PowerPoint and
    PDF downloads come from the same menu. Alternatives if a different home
    is wanted: the Google Workspace connector (Google Slides, needs the

@@ -1,13 +1,21 @@
 <section id="run" data-transition="fade" style="background:#FBFBF9;color:#1F2937;font-family:Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
-<h2 style="font-size:64px;font-weight:bold;line-height:1.1">Every change is tested and built by GitHub</h2>
+<h2 style="font-size:64px;font-weight:bold;line-height:1.1">GitHub tests and builds every change</h2>
 <div style="display:flex;gap:48px;align-items:start">
 <div style="width:700px;display:flex;flex-direction:column;gap:20px">
 <img src="/_blob/1e8fc8c96144cd0890b1217590d44924" alt="GitHub’s list of automatic build runs for the project, each with a green tick" style="width:700px;height:546px;object-fit:contain;border:1px solid #D1D5DB;border-radius:8px;background:#F3F6F9">
-<p style="font-size:27px;line-height:1.4;color:#4A5568">A green tick per change: tests passed, installers built. A red cross stops the release.</p>
+<p style="font-size:27px;line-height:1.4;color:#4A5568">One green tick per change. A red cross stops the release.</p>
 </div>
-<div style="width:916px;display:flex;flex-direction:column;gap:20px">
+<div style="width:916px;display:flex;flex-direction:column;gap:24px">
 <img src="/_blob/3f5e34f8f5094c39b5311fbc6711b5e7" alt="The build run for release 0.4.4: test, then build-windows and build-macos, then publish, 16 minutes in all" style="width:916px;height:441px;object-fit:contain;border:1px solid #D1D5DB;border-radius:8px;background:#F3F6F9">
-<p style="font-size:27px;line-height:1.4;color:#4A5568">The release run for version 0.4.4: <b>test, build Windows and Mac, publish</b>. Sixteen minutes, no one touched a machine.</p>
+<div style="display:flex;gap:12px;align-items:center">
+<div style="flex:1;display:flex;flex-direction:column;gap:4px;background:#F3F6F9;padding:16px 20px;border-radius:12px"><p style="font-size:26px;font-weight:bold">Test</p><p style="font-size:24px;color:#6B7280">55 s</p></div>
+<x-shape kind="arrow-right" style="width:48px;height:24px;background:#0B7285"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px;background:#F3F6F9;padding:16px 20px;border-radius:12px"><p style="font-size:26px;font-weight:bold">Build Windows</p><p style="font-size:24px;color:#6B7280">14 min</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px;background:#F3F6F9;padding:16px 20px;border-radius:12px"><p style="font-size:26px;font-weight:bold">Build Mac</p><p style="font-size:24px;color:#6B7280">7 min</p></div>
+<x-shape kind="arrow-right" style="width:48px;height:24px;background:#0B7285"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px;background:#0B7285;padding:16px 20px;border-radius:12px"><p style="font-size:26px;font-weight:bold;color:#F3F6F9">Publish</p><p style="font-size:24px;color:#DCEFF2">22 s</p></div>
+</div>
+<p style="font-size:27px;line-height:1.4;color:#4A5568">Release 0.4.4: sixteen minutes, no one touched a machine.</p>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Claude and GitHub on the Simulation Tool · 13</p>
