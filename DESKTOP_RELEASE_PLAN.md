@@ -1167,7 +1167,8 @@ documents, so the complete version can reuse them instead of re-deriving.
 | `Colocation_Proposal.pdf` | 2-page A4, same style as the cloud one: buy one 1U server, host it in a Bangkok data centre; budget ฿170,000 / expected ≈ ฿125,000 for 15 months (server ≈ ฿95k + hosting ฿2,000/mo × 15, setup free, as quoted to the owner 2026-10-24), then ฿2,000/mo; model chosen later from the 1U deck | `scripts/decks/proposals/colocation_proposal.html` → `node scripts/decks/make_pdf.mjs <html> <pdf> <preview.png>` (needs `npm i playwright-core@1` and Edge) |
 | `Software_First_Note.html` + artifact | one-page answer to the boss's "finish the software before the server?" (yes; keep the server decision cheap until real usage is measured) | `scripts/decks/proposals/software_first_page.html`, published as a claude.ai artifact |
 | `FTS_Focus_Next.pptx` | one slide, same white style: "finish the software first, keep the server decision cheap"; three columns (why, measured facts, how to keep it cheap), a 4-step order, the trade-off | `scripts/decks/make_focus_slide.py` + `export_slides.ps1` |
-| "How Claude and GitHub Help Build the Simulation Tool" (Claude Doc, 2026-11-08) | management briefing in plain words: what each tool does, the idea-to-user flow (drawn), what Claude does vs the engineer, what GitHub gives, results so far, cost/confidentiality/dependence Q&A, glossary | written as a shareable Claude Doc (https://claude.ai/artifact/Kfd46ngMRs9BqMowatsJtr); export to PDF/Word from its menu |
+| "How Claude and GitHub Help Build the Simulation Tool" (Claude Doc, 2026-11-08) | management briefing in plain words: what each tool does, the idea-to-user flow (drawn), what Claude does vs the engineer, what GitHub gives, results so far, cost/confidentiality/dependence Q&A, glossary; rewritten 2026-11-08 around the project with four screenshots (app with a day's traffic, Server load panel, GitHub build runs, release 0.4.4 page) | written as a shareable Claude Doc (https://claude.ai/artifact/Kfd46ngMRs9BqMowatsJtr); export to PDF/Word from its menu |
+| "Claude and GitHub on the Simulation Tool" (Slides artifact, 2026-11-08) | the same briefing as 13 white-clean 16:9 slides for the boss: cover, product picture, three roles, two tools table, 7-step idea-to-user flow, what Claude did (2 slides + Server load panel), one-rule statement slide, what GitHub gives, GitHub screenshots, results, Q&A, glossary | built with the claude.ai Slides artifact type, no code (https://claude.ai/artifact/YMUtZ3yLTpkq6vwGMAbLGH); slide sources kept in `scripts/decks/briefing_slides/`; download as PowerPoint or PDF from its Share menu; see "How the briefing deck is built" below |
 | `FTS_1U_Servers.pptx` | 2 slides, white clean: every 1U server considered for colocation, with same-size product photos, CPU, 1,000-flight time for 1 / 3 users, est. price incl. VAT, notes | `scripts/decks/make_1u_slides.py` (in the repo now) + `scripts/decks/export_slides.ps1` to check as PNG |
 
 ### Planning numbers (all in `PERFORMANCE_NOTES.md` Part 5 and the proposal)
@@ -1202,6 +1203,32 @@ documents, so the complete version can reuse them instead of re-deriving.
   Gen11, Lenovo SR250 V3, Fujitsu RX1330 M6 (all E-2478, ≈ 12 s / 38 s,
   ฿100–140k); Tier 3 EPYC 9124 and Xeon 6 boxes (฿200k+, not worth it).
   Every price except the Dell anchor is an estimate.
+
+### How the briefing deck is built (reusable, no code)
+
+1. Screenshots: start the engine and `next start` (prod build with
+   `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000`), then
+   `node scripts/decks/briefing_shots.mjs <out_dir>` (loads the 2,000-flight
+   CSV, presses Generate all, screenshots the map and the Tool > Server load
+   panel) and `node scripts/decks/briefing_gh_shots.mjs <out_dir>` (GitHub
+   build runs filtered to `desktop.yml`, and the release page). Both need
+   `playwright-core` and Edge. The pictures are kept in
+   `D:\ATC\deck_assetsriefing_shots\` (outside the repo; they show the
+   repository name and the owner's GitHub login).
+2. The deck is a claude.ai "Slides" artifact: Claude creates it from the
+   Slides type, uploads the screenshots as assets (each gets a `/_blob/<id>`
+   address), and writes one HTML `<section>` per slide plus `deck.json`
+   (order, sections, title). `scripts/decks/briefing_slides/` holds those
+   files as published; the `/_blob/` ids inside them belong to that one
+   artifact, so a new deck must re-upload the pictures and swap the ids.
+3. Style = the same as the pptx decks: Arial, ink #1F2937, muted #6B7280,
+   accent #0B7285, rule #D1D5DB, tint #F3F6F9, toned white #FBFBF9 as the
+   page; one accent-coloured statement slide; footer pinned at the bottom
+   with the deck name and slide number.
+4. The artifact is private until shared from its Share menu; PowerPoint and
+   PDF downloads come from the same menu. Alternatives if a different home
+   is wanted: the Google Workspace connector (Google Slides, needs the
+   connector enabled in claude.ai settings) or Canva / Gamma MCP connectors.
 
 ### How the 1U server deck is built (reusable)
 
