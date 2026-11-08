@@ -2,24 +2,24 @@
 <h2 style="font-size:64px;font-weight:bold;line-height:1.1">How a change travels from an idea to the user’s screen</h2>
 <p style="font-size:24px;color:#0B7285;font-weight:bold;text-transform:uppercase;letter-spacing:1px">Steps 1 to 4: on the engineer’s PC and on GitHub</p>
 <div style="display:flex;gap:16px;align-items:center">
-<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">1 · Idea</p><p style="font-size:25px;line-height:1.35">The engineer decides what the tool should do next</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">1 · Idea</p><p style="font-size:26px;line-height:1.35">The engineer decides what comes next</p></div>
 <x-shape kind="arrow-right" style="width:48px;height:24px;background:#D1D5DB"></x-shape>
-<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">2 · Build</p><p style="font-size:25px;line-height:1.35">Claude writes the code and runs the tests on the engineer’s PC</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">2 · Build</p><p style="font-size:26px;line-height:1.35">Claude writes the code and runs the tests</p></div>
 <x-shape kind="arrow-right" style="width:48px;height:24px;background:#D1D5DB"></x-shape>
-<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">3 · Review</p><p style="font-size:25px;line-height:1.35">The engineer reviews the change and saves it to GitHub</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">3 · Review</p><p style="font-size:26px;line-height:1.35">The engineer checks it and saves it to GitHub</p></div>
 <x-shape kind="arrow-right" style="width:48px;height:24px;background:#D1D5DB"></x-shape>
-<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">4 · Check and build</p><p style="font-size:25px;line-height:1.35">GitHub runs every test and builds the Windows and Mac installers</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">4 · Check and build</p><p style="font-size:26px;line-height:1.35">GitHub tests it and builds the installers</p></div>
 </div>
 <p style="font-size:24px;color:#0B7285;font-weight:bold;text-transform:uppercase;letter-spacing:1px">Steps 5 to 7: nobody touches a user’s computer</p>
 <div style="display:flex;gap:16px;align-items:center">
-<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">5 · Release</p><p style="font-size:25px;line-height:1.35">The engineer marks a numbered release; GitHub publishes it</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">5 · Release</p><p style="font-size:26px;line-height:1.35">The engineer marks a numbered version</p></div>
 <x-shape kind="arrow-right" style="width:48px;height:24px;background:#D1D5DB"></x-shape>
-<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">6 · Notice</p><p style="font-size:25px;line-height:1.35">The app checks GitHub when it starts, downloads the update, checks its signature</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">6 · Notice</p><p style="font-size:26px;line-height:1.35">The app finds the update and checks its signature</p></div>
 <x-shape kind="arrow-right" style="width:48px;height:24px;background:#D1D5DB"></x-shape>
-<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">7 · Install</p><p style="font-size:25px;line-height:1.35">The new version installs on the next start; the user sees the change</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F3F6F9;padding:28px;border-radius:12px"><p style="font-size:24px;color:#0B7285;font-weight:bold">7 · Install</p><p style="font-size:26px;line-height:1.35">It installs on the next start</p></div>
 <div style="width:48px"></div>
-<div style="flex:1;display:flex;flex-direction:column;gap:12px;padding:28px;border:2px dashed #D1D5DB;border-radius:12px"><p style="font-size:24px;color:#6B7280;font-weight:bold">If a test fails</p><p style="font-size:25px;line-height:1.35;color:#4A5568">The change goes back to step 2. Nothing reaches a user.</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;padding:28px;border:2px dashed #D1D5DB;border-radius:12px"><p style="font-size:24px;color:#6B7280;font-weight:bold">If a test fails</p><p style="font-size:26px;line-height:1.35;color:#4A5568">Back to step 2. Nothing reaches a user.</p></div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Claude and GitHub on the Simulation Tool · 5</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Claude and GitHub on the Simulation Tool · 7</p>
 <aside>Steps 1 to 4 happen on the engineer’s PC and on GitHub. Steps 5 to 7 run on their own: the app notices the new release, checks its signature and installs it on the next start. A failed test at step 4 stops the release.</aside>
 </section>

@@ -3,12 +3,13 @@
   "createdOnFiles": {"v": 1, "at": "2026-11-08T12:05:00Z"},
   "lists": "css",
   "title": "Claude and GitHub on the Simulation Tool",
-  "order": ["cover", "product", "roles", "tools", "flow", "claude1", "claude2", "rule", "github", "evidence", "results", "questions", "glossary"],
+  "order": ["cover", "product", "roles", "tools", "claudework", "notes", "flow", "claude1", "claude2", "rule", "github", "home", "run", "releases", "results", "questions", "glossary"],
   "sections": {
     "s1": {"description": "What the tool is and who builds it", "start": "cover"},
-    "s2": {"description": "How a change travels from an idea to the user's screen", "start": "flow"},
-    "s3": {"description": "What Claude and GitHub each contributed, with evidence", "start": "claude1"},
-    "s4": {"description": "Results so far, likely questions and the few technical words", "start": "results"}
+    "s2": {"description": "Claude's work as it appears on GitHub, and how a change travels to the user", "start": "claudework"},
+    "s3": {"description": "What Claude did on this project", "start": "claude1"},
+    "s4": {"description": "What GitHub gives us, in pictures", "start": "github"},
+    "s5": {"description": "Results so far, likely questions and the few technical words", "start": "results"}
   },
   "faces": {},
   "designSystems": []

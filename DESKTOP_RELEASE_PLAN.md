@@ -1168,7 +1168,7 @@ documents, so the complete version can reuse them instead of re-deriving.
 | `Software_First_Note.html` + artifact | one-page answer to the boss's "finish the software before the server?" (yes; keep the server decision cheap until real usage is measured) | `scripts/decks/proposals/software_first_page.html`, published as a claude.ai artifact |
 | `FTS_Focus_Next.pptx` | one slide, same white style: "finish the software first, keep the server decision cheap"; three columns (why, measured facts, how to keep it cheap), a 4-step order, the trade-off | `scripts/decks/make_focus_slide.py` + `export_slides.ps1` |
 | "How Claude and GitHub Help Build the Simulation Tool" (Claude Doc, 2026-11-08) | management briefing in plain words: what each tool does, the idea-to-user flow (drawn), what Claude does vs the engineer, what GitHub gives, results so far, cost/confidentiality/dependence Q&A, glossary; rewritten 2026-11-08 around the project with four screenshots (app with a day's traffic, Server load panel, GitHub build runs, release 0.4.4 page) | written as a shareable Claude Doc (https://claude.ai/artifact/Kfd46ngMRs9BqMowatsJtr); export to PDF/Word from its menu |
-| "Claude and GitHub on the Simulation Tool" (Slides artifact, 2026-11-08) | the same briefing as 13 white-clean 16:9 slides for the boss: cover, product picture, three roles, two tools table, 7-step idea-to-user flow, what Claude did (2 slides + Server load panel), one-rule statement slide, what GitHub gives, GitHub screenshots, results, Q&A, glossary | built with the claude.ai Slides artifact type, no code (https://claude.ai/artifact/YMUtZ3yLTpkq6vwGMAbLGH); slide sources kept in `scripts/decks/briefing_slides/`; download as PowerPoint or PDF from its Share menu; see "How the briefing deck is built" below |
+| "Claude and GitHub on the Simulation Tool" (Slides artifact, 2026-11-08) | the same briefing as 17 white-clean 16:9 slides for the boss, picture-led after the owner asked for "more pictures, fewer words": cover, product picture, three roles, two tools table, Claude's work on GitHub (commit list + a commit signed Co-Authored-By Claude), the notes file on GitHub, 7-step idea-to-user flow, six real examples (one table), Server load panel, one-rule statement slide, what GitHub gives, GitHub project home (36 commits / 11 releases / 2 contributors), build runs + the 0.4.4 release run graph, releases list + release assets, results, Q&A, glossary | built with the claude.ai Slides artifact type, no code (https://claude.ai/artifact/YMUtZ3yLTpkq6vwGMAbLGH); slide sources kept in `scripts/decks/briefing_slides/`; download as PowerPoint or PDF from its Share menu; see "How the briefing deck is built" below |
 | `FTS_1U_Servers.pptx` | 2 slides, white clean: every 1U server considered for colocation, with same-size product photos, CPU, 1,000-flight time for 1 / 3 users, est. price incl. VAT, notes | `scripts/decks/make_1u_slides.py` (in the repo now) + `scripts/decks/export_slides.ps1` to check as PNG |
 
 ### Planning numbers (all in `PERFORMANCE_NOTES.md` Part 5 and the proposal)
@@ -1211,10 +1211,20 @@ documents, so the complete version can reuse them instead of re-deriving.
    `node scripts/decks/briefing_shots.mjs <out_dir>` (loads the 2,000-flight
    CSV, presses Generate all, screenshots the map and the Tool > Server load
    panel) and `node scripts/decks/briefing_gh_shots.mjs <out_dir>` (GitHub
-   build runs filtered to `desktop.yml`, and the release page). Both need
-   `playwright-core` and Edge. The pictures are kept in
+   build runs filtered to `desktop.yml`, and the release page) and
+   `node scripts/decks/briefing_gh_more_shots.mjs <out_dir> <run_id> <sha>`
+   (repo home, commit list, one commit page, a release build run's job
+   graph, the releases list, PERFORMANCE_NOTES.md as rendered; run id from
+   `gh run list --workflow desktop.yml --json databaseId,headBranch`). All
+   need `playwright-core` and Edge. Crop GitHub's site header off (top 180
+   px at 1400 x 900) with Pillow before use. The pictures are kept in
    `D:\ATC\deck_assetsriefing_shots\` (outside the repo; they show the
    repository name and the owner's GitHub login).
+   Do NOT take a desktop screen capture for a "Claude at work" picture: on
+   this PC the foreground window was the owner's personal browser both
+   times (2026-11-08), and the captures had to be deleted. The commit page
+   with the Co-Authored-By line and the contributors panel on the repo home
+   are the honest pictures of Claude's work.
 2. The deck is a claude.ai "Slides" artifact: Claude creates it from the
    Slides type, uploads the screenshots as assets (each gets a `/_blob/<id>`
    address), and writes one HTML `<section>` per slide plus `deck.json`
